@@ -6,6 +6,17 @@ are in [RE_HANDOFF_HISTORY.md](RE_HANDOFF_HISTORY.md).
 
 ## Current status
 
+## Android port (2026-10-31)
+
+The portable renderer path and native Android app are integrated on top of the
+portable 64-bit reconstruction source. The app provides SAF folder import,
+app-private writable game data, a CPU D3D8 compatibility layer, SDL presentation,
+and configurable touch controls. Debug APK builds have passed for the native
+ARM64, ARMv7, and x86_64 targets, and `apksigner` verifies the produced APK.
+Hardware gameplay, original-game-data launch, and a final signed release remain
+unverified. See [ANDROID_PORT.md](ANDROID_PORT.md) and
+`scripts/build-android.sh`.
+
 The target is the original Japanese TH08 1.00d executable, size 840,704 bytes,
 SHA-256 `330fbdbf58a710829d65277b4f312cfbb38d5448b3df523e79350b879213d924`.
 

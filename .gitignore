@@ -33,3 +33,14 @@ reccmp-build.yml
 *.idb
 *.i64
 *.pyc
+
+# Android SDK/build state and fetched SDL dependencies.
+/android/.gradle/
+/android/.idea/
+/android/local.properties
+/android/app/.cxx/
+/android/app/build/
+/3rdparty/SDL2/
+/3rdparty/SDL2_image/
+/3rdparty/SDL2_ttf/
+/3rdparty/freetype/

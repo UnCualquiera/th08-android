@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.th08reconstruction.port'
+    compileSdk 35
+    // Must match an NDK installed in the SDK; scripts/build-android.sh uses
+    // the same one. r28 builds all three ABIs with the clang toolchain.
+    ndkVersion '28.2.13676358'
+
+    defaultConfig {
+        applicationId 'org.th08reconstruction.port'
+        minSdk 28
+        targetSdk 35
+        versionCode 1
+        versionName '1.00d-port.1'
+
+        ndk {
+            // arm64 for current devices, armeabi-v7a for older 32-bit ones and
+            // x86_64 for emulators and x86_64 tablets.
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+
+        externalNativeBuild {
+            cmake {
+                // The repository root owns the source lists; the ANDROID branch
+                // of CMakeLists.txt builds the shared game library plus SDL.
+                arguments '-DTH08_ANDROID=ON'
+                targets 'SDL2', 'SDL2_image', 'SDL2_ttf', 'th08-modern'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('../../CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
+    sourceSets {
+        main {
+            // SDLActivity and its Java helpers come from the fetched SDL tree;
+            // everything else is this project's own code.
+            java.srcDirs += ['../../3rdparty/SDL2/android-project/app/src/main/java']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}

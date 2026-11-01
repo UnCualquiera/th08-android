@@ -1,14 +1,29 @@
 #include "modern/windows_runtime.hpp"
 
+#if !defined(__ANDROID__)
 #include <execinfo.h>
+#endif
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <windows.h>
+#if defined(__ANDROID__)
+#include <SDL.h>
+#include <atomic>
+#include <dirent.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdint.h>
+#include <sys/syscall.h>
+#include <ucontext.h>
+#include <unwind.h>
+#endif
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPTSTR, int);
 
@@ -104,10 +119,11 @@ void ReportFatalSignal(int signalNumber, siginfo_t *signalInfo, void *)
         snprintf(line, sizeof(line), "signal=%d fault-address=%p pid=%ld\n", signalNumber,
                  signalInfo != NULL ? signalInfo->si_addr : NULL, static_cast<long>(getpid()));
         WriteCrashLine(file, line);
-
+#if !defined(__ANDROID__)
         void *frames[64];
         int frameCount = backtrace(frames, sizeof(frames) / sizeof(frames[0]));
         backtrace_symbols_fd(frames, frameCount, file);
+#endif
         fsync(file);
         close(file);
     }
@@ -226,6 +242,304 @@ void InitializeTargetData()
 }
 }
 
+namespace
+{
+// Creates and removes a file in the current directory, which is exactly the
+// capability the game needs there for th08.cfg, its saves and its replays.
+bool DirectoryIsWritable()
+{
+    FILE *probe = fopen(".th08_write_probe", "wb");
+    if (probe == NULL) return false;
+    fclose(probe);
+    return remove(".th08_write_probe") == 0;
+}
+
+// Monotonic seconds since an unspecified epoch, used to timestamp the
+// diagnostic logs so an export can tell how far into a session each file was
+// opened and how long the game stayed alive.
+long long MonotonicSeconds()
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return static_cast<long long>(now.tv_sec);
+}
+
+// The diagnostic export can only be taken after the app restarts, so when a
+// previous session died without a clean shutdown (its heartbeat still says
+// "running"), the heartbeat is moved aside here instead of being overwritten
+// by the new session.
+void PreservePreviousHeartbeat()
+{
+    FILE *file = fopen("modern-heartbeat.txt", "r");
+    if (file == NULL) return;
+    char line[256];
+    bool running = false;
+    while (fgets(line, sizeof(line), file) != NULL)
+    {
+        if (strstr(line, "status=running") != NULL) { running = true; break; }
+    }
+    fclose(file);
+    if (!running) return;
+    remove("modern-heartbeat-prev.txt");
+    rename("modern-heartbeat.txt", "modern-heartbeat-prev.txt");
+}
+} // namespace
+
+#if defined(__ANDROID__)
+namespace
+{
+// A device without simpleperf, debuggerd or root cannot be profiled from the
+// outside, so a frozen game loop diagnoses itself: the present path rewrites
+// modern-heartbeat.txt once a second, and this watchdog notices when that
+// file has stopped changing for three seconds while the session is still
+// marked "running". It then signals every thread with SIGUSR2 (the game
+// threads keep SIGUSR1, SIGQUIT and SIGPIPE blocked), and each handler
+// records its exact instruction pointer (taken from the signal context)
+// plus its unwind trace into modern-stall.txt. The raw addresses are
+// symbolized offline against the unstripped build objects.
+std::atomic<int> g_StallDumped{0};
+
+struct UnwindBuffer
+{
+    char *buffer;
+    size_t offset;
+    size_t capacity;
+};
+
+_Unwind_Reason_Code AppendUnwindFrame(struct _Unwind_Context *context, void *argument)
+{
+    UnwindBuffer *unwind = static_cast<UnwindBuffer *>(argument);
+    if (unwind->offset + 32 < unwind->capacity)
+    {
+        unwind->offset += snprintf(unwind->buffer + unwind->offset, unwind->capacity - unwind->offset,
+                                   "  unwind=0x%08lx\n", (unsigned long)_Unwind_GetIP(context));
+    }
+    return _URC_NO_REASON;
+}
+
+void StallHandler(int, siginfo_t *, void *context)
+{
+    const ucontext_t *signalContext = static_cast<const ucontext_t *>(context);
+    char buffer[8192];
+    size_t offset = snprintf(buffer, sizeof(buffer), "tid=%ld\n", (long)syscall(SYS_gettid));
+#if defined(__aarch64__)
+    const unsigned long pc = signalContext->uc_mcontext.pc;
+    const unsigned long long framePointer =
+        signalContext->uc_mcontext.regs[29];
+    const unsigned long long linkRegister = signalContext->uc_mcontext.regs[30];
+    const unsigned long long stackPointer = signalContext->uc_mcontext.sp;
+#elif defined(__arm__)
+    const unsigned long pc = signalContext->uc_mcontext.arm_pc;
+    const unsigned long long framePointer = signalContext->uc_mcontext.arm_fp;
+    const unsigned long long linkRegister = signalContext->uc_mcontext.arm_lr;
+    const unsigned long long stackPointer = signalContext->uc_mcontext.arm_sp;
+#else
+    const unsigned long pc = 0;
+    const unsigned long long framePointer = 0;
+    const unsigned long long linkRegister = 0;
+    const unsigned long long stackPointer = 0;
+#endif
+    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "  pc=0x%08lx\n", pc);
+    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "  lr=0x%08lx\n",
+                       (unsigned long)linkRegister);
+    // The handler runs on the interrupted thread, so its stack can be read
+    // directly: walk the AAPCS64/ARM frame-pointer chain by hand, without
+    // any unwinding library (the signal trampoline confuses _Unwind).
+    unsigned long long frame = framePointer;
+    for (int level = 0; level < 48 && frame != 0; level++)
+    {
+        unsigned long long savedFrame = 0;
+        unsigned long long returnAddress = 0;
+        if (frame + 16 > stackPointer + 1048576) break;
+        __builtin_memcpy(&savedFrame, reinterpret_cast<const void *>(frame), sizeof(savedFrame));
+        __builtin_memcpy(&returnAddress, reinterpret_cast<const void *>(frame + (sizeof(unsigned long long) == 8 ? 8 : 4)),
+                         sizeof(returnAddress));
+        if (returnAddress == 0 || savedFrame < frame) break;
+        offset += snprintf(buffer + offset, sizeof(buffer) - offset, "  frame pc=0x%08lx\n",
+                           (unsigned long)returnAddress);
+        frame = savedFrame;
+    }
+    const int file = open("modern-stall.txt", O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (file >= 0)
+    {
+        write(file, buffer, offset);
+        close(file);
+    }
+    // The full memory map identifies the region the interrupted code lives in
+    // (and where the giant allocation landed). Only the main thread dumps it.
+    if (syscall(SYS_gettid) == syscall(SYS_getpid))
+    {
+        FILE *maps = fopen("/proc/self/maps", "r");
+        if (maps != NULL)
+        {
+            FILE *out = fopen("modern-stall.txt", "a");
+            if (out != NULL)
+            {
+                char line[512];
+                while (fgets(line, sizeof(line), maps) != NULL)
+                {
+                    fputs(line, out);
+                }
+                fclose(out);
+            }
+            fclose(maps);
+        }
+    }
+}
+
+void AppendThreadDump(long tid)
+{
+    if (tid == syscall(SYS_gettid)) return;
+    FILE *out = fopen("modern-stall.txt", "a");
+    if (out != NULL)
+    {
+        fprintf(out, "tid=%ld signaling\n", (long)tid);
+        fclose(out);
+    }
+    if (syscall(SYS_tgkill, syscall(SYS_getpid), tid, SIGUSR2) != 0)
+    {
+        out = fopen("modern-stall.txt", "a");
+        if (out != NULL)
+        {
+            fprintf(out, "tid=%ld signal failed\n", (long)tid);
+            fclose(out);
+        }
+        return;
+    }
+    // Give the handler time to write its own section before moving on.
+    usleep(20000);
+}
+
+void DumpStalledThreads()
+{
+    long long frames = -1;
+    FILE *heartbeat = fopen("modern-heartbeat.txt", "r");
+    if (heartbeat != NULL)
+    {
+        char line[256];
+        while (fgets(line, sizeof(line), heartbeat) != NULL)
+        {
+            const char *found = strstr(line, "frames_total=");
+            if (found != NULL) frames = atoll(found + strlen("frames_total="));
+        }
+        fclose(heartbeat);
+    }
+    FILE *out = fopen("modern-stall.txt", "a");
+    if (out != NULL)
+    {
+        fprintf(out, "=== stall detected at epoch=%lld frames_total=%lld ===\n",
+                static_cast<long long>(time(NULL)), frames);
+        fclose(out);
+    }
+    DIR *tasks = opendir("/proc/self/task");
+    if (tasks == NULL)
+    {
+        out = fopen("modern-stall.txt", "a");
+        if (out != NULL)
+        {
+            fprintf(out, "opendir /proc/self/task failed\n");
+            fclose(out);
+        }
+        return;
+    }
+    struct dirent *entry;
+    while ((entry = readdir(tasks)) != NULL)
+    {
+        if (entry->d_name[0] == '.') continue;
+        const long tid = atol(entry->d_name);
+        if (tid > 0) AppendThreadDump(tid);
+    }
+    closedir(tasks);
+    out = fopen("modern-stall.txt", "a");
+    if (out != NULL)
+    {
+        fprintf(out, "=== dump complete ===\n");
+        fclose(out);
+    }
+}
+
+void *StallWatchdog(void *)
+{
+    struct stat previous;
+    memset(&previous, 0, sizeof(previous));
+    bool havePrevious = false;
+    int frozenSeconds = 0;
+    for (;;)
+    {
+        sleep(1);
+        struct stat info;
+        if (stat("modern-heartbeat.txt", &info) != 0)
+        {
+            havePrevious = false;
+            frozenSeconds = 0;
+            continue;
+        }
+        FILE *heartbeat = fopen("modern-heartbeat.txt", "r");
+        if (heartbeat != NULL)
+        {
+            char line[256];
+            bool closed = false;
+            while (fgets(line, sizeof(line), heartbeat) != NULL)
+            {
+                if (strstr(line, "status=closed") != NULL) { closed = true; break; }
+            }
+            fclose(heartbeat);
+            if (closed)
+            {
+                // The game is ending by itself; a heartbeat that stops moving
+                // here is a shutdown, not a stall.
+                havePrevious = false;
+                frozenSeconds = 0;
+                continue;
+            }
+        }
+        if (havePrevious && info.st_mtim.tv_sec == previous.st_mtim.tv_sec &&
+            info.st_mtim.tv_nsec == previous.st_mtim.tv_nsec)
+        {
+            if (++frozenSeconds == 3 && g_StallDumped.exchange(1) == 0)
+            {
+                DumpStalledThreads();
+            }
+        }
+        else
+        {
+            frozenSeconds = 0;
+            previous = info;
+            havePrevious = true;
+        }
+    }
+    return NULL;
+}
+
+void StartStallWatchdog()
+{
+    // The game threads keep SIGUSR1, SIGQUIT and SIGPIPE blocked (an
+    // SDL/Java thread inheritance), so the watchdog communicates over
+    // SIGUSR2, which no game thread masks.
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_sigaction = StallHandler;
+    action.sa_flags = SA_SIGINFO | SA_RESTART;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGUSR2, &action, NULL);
+
+    FILE *out = fopen("modern-stall.txt", "a");
+    if (out != NULL)
+    {
+        fprintf(out, "=== session start epoch=%lld ===\n", static_cast<long long>(time(NULL)));
+        fclose(out);
+    }
+
+    pthread_t thread;
+    pthread_attr_t attributes;
+    pthread_attr_init(&attributes);
+    pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
+    pthread_create(&thread, &attributes, StallWatchdog, NULL);
+    pthread_attr_destroy(&attributes);
+}
+} // namespace
+#endif
+
 bool ConfigureDataDirectory()
 {
     const char *directory = NULL;
@@ -246,6 +560,36 @@ bool ConfigureDataDirectory()
         }
     }
 
+#if defined(__ANDROID__)
+    // The setup activity stores the selected game folder in internal storage
+    // before the game activity starts, so a cold launch finds it here. The
+    // stored path always names a real filesystem directory: either a directly
+    // readable folder on the primary storage or the app-private copy.
+    static char androidDirectory[1024];
+    if (directory == NULL)
+    {
+        const char *internal = SDL_AndroidGetInternalStoragePath();
+        if (internal != NULL)
+        {
+            char path[1024];
+            snprintf(path, sizeof(path), "%s/th08_data_dir.txt", internal);
+            FILE *file = fopen(path, "r");
+            if (file != NULL)
+            {
+                if (fgets(androidDirectory, sizeof(androidDirectory), file) != NULL)
+                {
+                    size_t length = strlen(androidDirectory);
+                    while (length > 0 && (androidDirectory[length - 1] == '\n' ||
+                                          androidDirectory[length - 1] == '\r'))
+                        androidDirectory[--length] = '\0';
+                    if (length > 0) directory = androidDirectory;
+                }
+                fclose(file);
+            }
+        }
+    }
+#endif
+
     if (directory != NULL && (directory[0] == '\0' || chdir(directory) != 0))
     {
         fprintf(stderr, "th08-modern: unable to enter data directory: %s\n", directory);
@@ -258,10 +602,47 @@ bool ConfigureDataDirectory()
         fprintf(stderr, "th08-modern: selected directory does not contain th08.dat\n");
         return false;
     }
+
+    // The game writes th08.cfg, its saves and its replays into this working
+    // directory. On Android a folder can be entered and read while plain-path
+    // writes to it are rejected, and that would only surface later as a fatal
+    // config error, so writability is verified here, right after the data
+    // check, with a fallback to the app-private copy the setup activity keeps
+    // populated.
+    if (!DirectoryIsWritable())
+    {
+#if defined(__ANDROID__)
+        const char *internal = SDL_AndroidGetInternalStoragePath();
+        char fallback[1024];
+        if (internal != NULL &&
+            snprintf(fallback, sizeof(fallback), "%s/game", internal) > 0 &&
+            chdir(fallback) == 0 && stat("th08.dat", &info) == 0 &&
+            S_ISREG(info.st_mode) && DirectoryIsWritable())
+        {
+            fprintf(stderr,
+                    "th08-modern: data directory rejects writes, using the app-private copy: %s\n",
+                    fallback);
+        }
+        else
+#endif
+        {
+            fprintf(stderr, "th08-modern: data directory is not writable: %s\n", strerror(errno));
+            return false;
+        }
+    }
+    {
+        char workingDirectory[1024];
+        if (getcwd(workingDirectory, sizeof(workingDirectory)) != NULL)
+            fprintf(stderr, "th08-modern: game data directory: %s\n", workingDirectory);
+    }
+    PreservePreviousHeartbeat();
     unlink("modern-files.txt");
     unlink("modern-crash.txt");
     unlink("modern-render.txt");
     unlink("modern-enemy-render.csv");
+#if defined(__ANDROID__)
+    StartStallWatchdog();
+#endif
     return true;
 }
 
@@ -282,7 +663,8 @@ void LogArchiveRequest(const char *path)
     FILE *file = fopen("modern-files.txt", "ab");
     if (file == NULL)
         return;
-    fprintf(file, "thread=%08lx path=%s\n", (unsigned long)GetCurrentThreadId(), path != NULL ? path : "<null>");
+    fprintf(file, "t=%llds thread=%08lx path=%s\n", MonotonicSeconds(), (unsigned long)GetCurrentThreadId(),
+            path != NULL ? path : "<null>");
     fclose(file);
 }
 
@@ -291,11 +673,26 @@ void SetArguments(int argc, char **argv)
     g_argumentCount = argc;
     g_arguments = argv;
 }
+
+// Rewrites the heartbeat on the way out: a file that still says
+// "status=running" at the next launch is a session that never exited cleanly,
+// while "closed" means the game ended by itself.
+void MarkCleanExit()
+{
+#if defined(__ANDROID__)
+    FILE *heartbeat = fopen("modern-heartbeat.txt", "w");
+    if (heartbeat == NULL) return;
+    fprintf(heartbeat, "status=closed epoch=%lld\n", static_cast<long long>(time(NULL)));
+    fclose(heartbeat);
+#endif
+}
 } // namespace modern
 } // namespace th08
 
 int main(int argc, char **argv)
 {
     th08::modern::SetArguments(argc, argv);
-    return WinMain(NULL, NULL, NULL, 0);
+    int result = WinMain(NULL, NULL, NULL, 0);
+    th08::modern::MarkCleanExit();
+    return result;
 }

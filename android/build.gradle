@@ -1,0 +1,5 @@
+// Root build file. The Android plugin version is pinned so the APK build
+// stays reproducible across machines.
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
+}

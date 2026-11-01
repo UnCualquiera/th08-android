@@ -81,20 +81,49 @@ set(TH08_GAME_SOURCES
 if(WIN32)
     list(APPEND TH08_GAME_SOURCES src/modern/windows_runtime.cpp)
     add_executable(th08-modern WIN32 ${TH08_GAME_SOURCES})
-elseif(UNIX AND NOT APPLE)
-    set(TH08_LINUX_ADAPTER_SOURCES
-        src/modern/linux/d3d8_compat.cpp
+elseif(ANDROID)
+    # Android loads a shared library from SDLActivity. SDL's bootstrap renames
+    # main to SDL_main, which linux_runtime.cpp provides, so the entry path is
+    # shared with the desktop software build.
+    set(TH08_ANDROID_ADAPTER_SOURCES
+        src/modern/software/software_d3d8.cpp
+        src/modern/software/software_compat.cpp
+        src/modern/software/sdl_present.cpp
         src/modern/linux/d3dx8_compat.cpp
         src/modern/linux/linux_compat.cpp
         src/modern/linux/linux_runtime.cpp
-        src/modern/linux/render_audit.cpp
+        src/modern/touch/touch_controls.cpp
     )
-    set(TH08_LINUX_HOT_ADAPTER_SOURCES
-        src/modern/linux/d3d8_compat.cpp
-        src/modern/linux/d3dx8_compat.cpp
-        src/modern/linux/linux_compat.cpp
-    )
-    list(APPEND TH08_GAME_SOURCES ${TH08_LINUX_ADAPTER_SOURCES})
+    list(APPEND TH08_GAME_SOURCES ${TH08_ANDROID_ADAPTER_SOURCES})
+    add_library(th08-modern SHARED ${TH08_GAME_SOURCES})
+elseif(UNIX AND NOT APPLE)
+    option(TH08_SOFTWARE_RENDERER "Use the CPU Direct3D 8 back end (Android port)" OFF)
+    if(TH08_SOFTWARE_RENDERER)
+        set(TH08_SOFTWARE_ADAPTER_SOURCES
+            src/modern/software/software_d3d8.cpp
+            src/modern/software/software_compat.cpp
+            src/modern/software/sdl_present.cpp
+            src/modern/linux/d3dx8_compat.cpp
+            src/modern/linux/linux_compat.cpp
+            src/modern/linux/linux_runtime.cpp
+            src/modern/touch/touch_controls.cpp
+        )
+        list(APPEND TH08_GAME_SOURCES ${TH08_SOFTWARE_ADAPTER_SOURCES})
+    else()
+        set(TH08_LINUX_ADAPTER_SOURCES
+            src/modern/linux/d3d8_compat.cpp
+            src/modern/linux/d3dx8_compat.cpp
+            src/modern/linux/linux_compat.cpp
+            src/modern/linux/linux_runtime.cpp
+            src/modern/linux/render_audit.cpp
+        )
+        set(TH08_LINUX_HOT_ADAPTER_SOURCES
+            src/modern/linux/d3d8_compat.cpp
+            src/modern/linux/d3dx8_compat.cpp
+            src/modern/linux/linux_compat.cpp
+        )
+        list(APPEND TH08_GAME_SOURCES ${TH08_LINUX_ADAPTER_SOURCES})
+    endif()
     add_executable(th08-modern ${TH08_GAME_SOURCES})
 else()
     message(FATAL_ERROR "The modern target currently supports Windows and Linux.")
@@ -183,6 +212,74 @@ elseif(MSVC)
         dxguid d3dx8 dinput8 dsound d3d8 winmm
         kernel32 user32 gdi32 advapi32 shell32 ole32 oleaut32 uuid dbghelp
     )
+elseif(ANDROID)
+    # SDL and the text stack are built from the vendored source trees that
+    # scripts/build-android.sh fetches into 3rdparty/. Gradle points its
+    # native build at this file for both ABIs.
+    if(NOT TARGET SDL2::SDL2)
+        set(SDL_SHARED ON CACHE BOOL "Build SDL2 as a shared library" FORCE)
+        set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+        add_subdirectory("${CMAKE_SOURCE_DIR}/3rdparty/SDL2" "${CMAKE_BINARY_DIR}/SDL2")
+    endif()
+    if(NOT TARGET SDL2_image::SDL2_image)
+        add_subdirectory("${CMAKE_SOURCE_DIR}/3rdparty/SDL2_image" "${CMAKE_BINARY_DIR}/SDL2_image")
+    endif()
+    if(NOT TARGET SDL2_ttf::SDL2_ttf)
+        add_subdirectory("${CMAKE_SOURCE_DIR}/3rdparty/SDL2_ttf" "${CMAKE_BINARY_DIR}/SDL2_ttf")
+    endif()
+    if(NOT TARGET freetype)
+        # linux_compat measures GDI font heights through FreeType directly.
+        # Keep the build independent of any system library: Android has none.
+        set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+        add_subdirectory("${CMAKE_SOURCE_DIR}/3rdparty/freetype" "${CMAKE_BINARY_DIR}/freetype")
+    endif()
+
+    target_compile_definitions(th08-modern PRIVATE
+        TH08_MODERN_LINUX
+        TH08_SOFTWARE_RENDERER
+        # The original fixed-address layout needs a non-PIE executable, which
+        # Android never provides. Both ABIs therefore run the symbolic layout
+        # that the portable-64bit line already validates on 64-bit hosts.
+        TH08_PORTABLE_NATIVE_LAYOUT
+        _FILE_OFFSET_BITS=64
+        _TIME_BITS=64
+    )
+    target_compile_options(th08-modern PRIVATE
+        # The reconstructed game TUs keep the original /Od-style boundaries.
+        -O0
+        -fpermissive
+        -fdata-sections
+        -fno-omit-frame-pointer
+        -Wno-write-strings
+        # The reconstruction takes the address of D3DX temporaries where VC7
+        # did; the pointed-to values are only read during the call. GCC has no
+        # such diagnostic, and clang makes this one an error by default. The
+        # same applies to printf(variable) call sites kept from VC7, which the
+        # NDK turns into errors through -Werror=format-security.
+        -Wno-address-of-temporary
+        -Wno-format-security
+        "-include${CMAKE_SOURCE_DIR}/src/modern/linux/linux_compat.hpp"
+    )
+    # Everything above the adapter boundary is new platform code, including the
+    # CPU rasterizer, which must run at -O2 to hold the 60 Hz frame budget on a
+    # phone.
+    set_source_files_properties(${TH08_ANDROID_ADAPTER_SOURCES} PROPERTIES
+        COMPILE_OPTIONS "-O2;-fno-strict-aliasing"
+    )
+    target_include_directories(th08-modern BEFORE PRIVATE
+        "${CMAKE_SOURCE_DIR}/src/modern/linux/include"
+    )
+    target_link_libraries(th08-modern PRIVATE
+        SDL2::SDL2
+        SDL2_image::SDL2_image
+        SDL2_ttf::SDL2_ttf
+        freetype
+        log
+        android
+    )
 elseif(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
@@ -190,17 +287,22 @@ elseif(UNIX AND NOT APPLE)
     pkg_check_modules(SDL2_TTF REQUIRED IMPORTED_TARGET SDL2_ttf)
     find_package(Fontconfig REQUIRED)
     find_package(Freetype REQUIRED)
-    # Prefer the broadly deployed libGL.so.1 runtime ABI over GLVND's separate
-    # libOpenGL.so.0 dispatch library for the 32-bit portable build.
-    set(OpenGL_GL_PREFERENCE LEGACY)
-    find_package(OpenGL REQUIRED)
     find_package(Threads REQUIRED)
+    if(NOT TH08_SOFTWARE_RENDERER)
+        # Prefer the broadly deployed libGL.so.1 runtime ABI over GLVND's separate
+        # libOpenGL.so.0 dispatch library for the 32-bit portable build.
+        set(OpenGL_GL_PREFERENCE LEGACY)
+        find_package(OpenGL REQUIRED)
+    endif()
 
     target_compile_definitions(th08-modern PRIVATE
         TH08_MODERN_LINUX
         _FILE_OFFSET_BITS=64
         _TIME_BITS=64
     )
+    if(TH08_SOFTWARE_RENDERER)
+        target_compile_definitions(th08-modern PRIVATE TH08_SOFTWARE_RENDERER)
+    endif()
     target_compile_options(th08-modern PRIVATE
         # Keep the original /Od-style TU boundaries in every CMake build type.
         -O0
@@ -240,10 +342,12 @@ elseif(UNIX AND NOT APPLE)
         PkgConfig::SDL2_TTF
         Fontconfig::Fontconfig
         Freetype::Freetype
-        OpenGL::GL
         Threads::Threads
         dl
     )
+    if(NOT TH08_SOFTWARE_RENDERER)
+        target_link_libraries(th08-modern PRIVATE OpenGL::GL)
+    endif()
     add_custom_command(TARGET th08-modern POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/resources/modern-icon.png"

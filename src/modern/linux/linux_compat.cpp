@@ -6,10 +6,14 @@
 #include <dinput.h>
 #include <dsound.h>
 
+#include "../software/sdl_present.hpp"
+
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#if !defined(__ANDROID__)
 #include <fontconfig/fontconfig.h>
+#endif
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_TRUETYPE_TABLES_H
@@ -212,6 +216,26 @@ const char *ResolveJapaneseFont()
         return path.c_str();
     }
 
+#if defined(__ANDROID__)
+    // Android has no fontconfig. A font dropped next to the game data is used
+    // first, then the system CJK fonts that ship on current devices.
+    static const char *candidates[] = {
+        "font/vlgothic.ttf",
+        "vlgothic.ttf",
+        "/system/fonts/NotoSansCJK-Regular.ttc",
+        "/system/fonts/NotoSansCJKjp-Regular.otf",
+        "/system/fonts/DroidSansFallbackFull.ttf",
+    };
+    for (size_t index = 0; index < sizeof(candidates) / sizeof(candidates[0]); ++index)
+    {
+        if (access(candidates[index], R_OK) == 0)
+        {
+            path = candidates[index];
+            return path.c_str();
+        }
+    }
+    return NULL;
+#else
     if (!FcInit()) return NULL;
     FcPattern *pattern = FcPatternCreate();
     if (pattern == NULL) return NULL;
@@ -229,6 +253,7 @@ const char *ResolveJapaneseFont()
         path = reinterpret_cast<const char *>(file);
     FcPatternDestroy(match);
     return path.empty() ? NULL : path.c_str();
+#endif
 }
 
 bool GetGdiFontSize(const char *path, int height, int *pixelSize, int *ascent)
@@ -411,6 +436,12 @@ void FillKeyboard(BYTE *state, bool directInput)
         MAP_KEY(VK_RETURN, SDL_SCANCODE_RETURN);
     }
 #undef MAP_KEY
+#if defined(TH08_SOFTWARE_RENDERER)
+    // The virtual gamepad is merged into both input paths, so the game sees the
+    // touch controls whichever keyboard interface it selected at startup. The
+    // GL back end has no control layer and skips this.
+    th08::modern::ApplyTouchInput(state);
+#endif
 }
 } // namespace
 
@@ -622,15 +653,49 @@ LRESULT DispatchMessageA(const MSG *message) { return g_windowProcedure != NULL 
 LRESULT DefWindowProcA(HWND, UINT, WPARAM, LPARAM) { return 0; }
 BOOL RegisterClassA(const WNDCLASSA *value) { g_windowProcedure = value->lpfnWndProc; return TRUE; }
 
+// The game builds its window title as Shift-JIS text ("東方永夜抄 ... ver
+// 1.00d"). SDL's Android backend hands that title to JNI NewStringUTF, which
+// aborts the whole process when the bytes are not valid Modified UTF-8, so
+// the title is folded to ASCII before SDL ever sees it. Android shows no
+// window title bar, so this affects SDL-internal cosmetics only; every
+// Shift-JIS character folds into a single '?'.
+static std::string WindowTitleForJni(LPCSTR title)
+{
+    std::string safe;
+    if (title == NULL) return safe;
+    for (const unsigned char *cursor = reinterpret_cast<const unsigned char *>(title); *cursor; ++cursor)
+    {
+        if (*cursor < 0x80) { safe.push_back(static_cast<char>(*cursor)); continue; }
+        safe.push_back('?');
+        // Skip the trail byte of a double-byte Shift-JIS sequence so one
+        // character yields one question mark.
+        if (((*cursor >= 0x81 && *cursor <= 0x9F) || *cursor >= 0xE0) && cursor[1] != 0)
+            ++cursor;
+    }
+    return safe;
+}
+
 HWND CreateWindowExA(DWORD, LPCSTR, LPCSTR title, DWORD style, int, int, int width, int height, HWND, HANDLE, HINSTANCE, LPVOID)
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)
     { fprintf(stderr, "th08-modern: SDL_Init failed: %s\n", SDL_GetError()); return NULL; }
+#if defined(TH08_SOFTWARE_RENDERER)
+    // The CPU back end presents through an SDL_Renderer, so the window needs no
+    // GL context of its own on the desktop. Android's SDL video backend has no
+    // window-surface path for the software renderer, so the GLES renderer that
+    // performs the final blit needs the context this flag creates at window
+    // creation; without it SDL would have to recreate the window mid-startup.
+    Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+#if defined(__ANDROID__)
+    flags |= SDL_WINDOW_OPENGL;
+#endif
+#else
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN;
+#endif
     if (style == WS_OVERLAPPEDWINDOW)
     {
         SDL_DisplayMode desktop;
@@ -642,9 +707,17 @@ HWND CreateWindowExA(DWORD, LPCSTR, LPCSTR title, DWORD style, int, int, int wid
         flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
     else { width = 640; height = 480; }
-    g_window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
+    g_window = SDL_CreateWindow(WindowTitleForJni(title).c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
     if (g_window == NULL) fprintf(stderr, "th08-modern: SDL_CreateWindow failed: %s\n", SDL_GetError());
-    else SetApplicationIcon(g_window);
+    else
+    {
+        SetApplicationIcon(g_window);
+#if defined(TH08_SOFTWARE_RENDERER)
+        // The CPU back end presents through the shared SDL presenter, which also
+        // owns the touch control layer.
+        th08::modern::InstallSoftwarePresenterForWindow(g_window);
+#endif
+    }
     return reinterpret_cast<HWND>(g_window);
 }
 

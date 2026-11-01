@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TH08 (reconstruction)</string>
+
+    <string name="setup_title">Touhou 08 — PC-98 era data setup</string>
+    <string name="setup_explanation">Point this app at the folder of the original Japanese\nTH08 1.00d release (it must contain th08.dat). The game data\nis not included with this app.</string>
+
+    <string name="status_no_folder">No game folder selected yet.</string>
+    <string name="status_invalid_folder">th08.dat is not directly inside the selected folder. Choose the folder that contains the game files themselves (th08.dat, thbgm.dat).</string>
+    <string name="status_refresh_needed">The previously selected folder has to be chosen again: the game data is now copied into the app\'s private storage, which is the only place the game can save into on every device.</string>
+    <string name="status_working">Reading the selected folder…</string>
+    <string name="status_copying">Copying game data into the app\'s storage…</string>
+    <string name="status_copy_failed">Import failed: %1$s</string>
+    <string name="status_folder">Game folder: %1$s\n%2$s</string>
+    <string name="status_ready">Game data found.</string>
+    <string name="status_no_music">Game data found. thbgm.dat is missing, so stages will have no music.</string>
+
+    <string name="pick_folder">Choose game folder…</string>
+    <string name="start_game">Start game</string>
+    <string name="export_logs">Export logs</string>
+    <string name="status_exporting">Collecting logs…</string>
+    <string name="status_exported">Logs saved to %1$s</string>
+    <string name="status_export_failed">Log export failed: %1$s</string>
+    <string name="share_logs_title">Send the diagnostic logs</string>
+
+    <string name="controls_header">On-screen controls</string>
+    <string name="stick_fixed">Fixed movement stick</string>
+    <string name="stick_floating">Floating movement stick</string>
+    <string name="left_handed">Left-handed layout</string>
+    <string name="display_fill">Full screen (stretched to the edges)</string>
+    <string name="display_fit">Original 4:3 proportions (black bars)</string>
+    <string name="opacity_label">Overlay opacity</string>
+    <string name="scale_label">Control size</string>
+    <string name="dead_zone_label">Stick dead zone</string>
+
+    <string name="error_no_document_provider">This device has no file manager that can pick a folder.</string>
+    <string name="error_storage">Storage error: %1$s</string>
+</resources>
