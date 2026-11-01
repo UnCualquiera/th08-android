@@ -1022,7 +1022,7 @@ class SoftwareDevice : public IDirect3DDevice8
                             for (int channel = 0; channel < 4; ++channel)
                             {
                                 const int mixed = Multiply(sourceColor[channel], sourceFactor) +
-                                                 Multiply(existing[channel], 255 - destinationFactor);
+                                                 Multiply(existing[channel], destinationFactor);
                                 rgba[channel] = static_cast<BYTE>(mixed < 0 ? 0 : (mixed > 255 ? 255 : mixed));
                             }
                         }

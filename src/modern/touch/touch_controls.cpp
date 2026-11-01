@@ -58,9 +58,9 @@ void Controls::SetOverlayVisible(bool visible)
 
 void Controls::NotifyPhysicalInput()
 {
-    // A keyboard key or a controller button replaces the on-screen controls;
-    // the next touch brings the overlay back.
-    if (overlayVisible) SetOverlayVisible(false);
+    // Physical and on-screen input are alternatives, not mutually exclusive.
+    // Keeping the overlay visible avoids it disappearing between mixed-input
+    // sessions or due to Android keyboard and accessibility events.
 }
 
 void Controls::Configure(const Settings &next)
@@ -205,13 +205,9 @@ Controls::Finger *Controls::AcquireFinger()
 
 void Controls::FingerDown(long id, float x, float y)
 {
-    // A touch while the overlay is hidden only brings it back; the finger
-    // that revealed it must not press a control by accident.
-    if (!overlayVisible)
-    {
-        overlayVisible = true;
-        return;
-    }
+    // A first touch can restore the overlay and press a control in the same
+    // gesture, which keeps setup and gameplay responsive after mixed input.
+    if (!overlayVisible) overlayVisible = true;
     if (FindFinger(id) != NULL) FingerUp(id);
     Finger *finger = AcquireFinger();
     if (finger == NULL) return;
