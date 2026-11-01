@@ -207,10 +207,15 @@ bool SdlSoftwarePresenter::Initialize(SDL_Window *window_, touch::Controls *cont
     // bind only refreshes the pointers.
     if (renderer != NULL) return true;
 
-    // The Android and desktop builds both create the window with an OpenGL ES
-    // / OpenGL context, so an accelerated renderer can reuse it. Fall back to
-    // the software renderer when no accelerated driver is available.
-    // VSync avoids wasting GPU/CPU time on frames the display cannot show.
+    // Avoid VSync during startup on Android: some GLES/Vulkan Android drivers
+    // can block SDL_RenderPresent or stall while acquiring the first frame.
+    // Explicitly testing the accelerated and software paths without VSync lets
+    // the presenter fall back immediately instead of freezing the native loop.
+#if defined(__ANDROID__)
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (renderer == NULL)
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+#else
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL)
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -218,6 +223,7 @@ bool SdlSoftwarePresenter::Initialize(SDL_Window *window_, touch::Controls *cont
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL)
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+#endif
     if (renderer == NULL)
     {
         fprintf(stderr, "th08-modern: SDL_CreateRenderer failed: %s\n", SDL_GetError());
@@ -388,6 +394,21 @@ void SdlSoftwarePresenter::UpdateLetterbox()
 void SdlSoftwarePresenter::Present(const unsigned char *pixels, int width, int height, int pitch)
 {
     if (renderer == NULL || pixels == NULL || width <= 0 || height <= 0) return;
+
+#if defined(__ANDROID__)
+    static bool firstFrameRecorded = false;
+    if (!firstFrameRecorded)
+    {
+        FILE *boot = fopen("modern-boot.txt", "w");
+        if (boot != NULL)
+        {
+            fprintf(boot, "status=running stage=first-frame epoch=%lld\n",
+                    static_cast<long long>(time(NULL)));
+            fclose(boot);
+        }
+        firstFrameRecorded = true;
+    }
+#endif
 
     // Once a second the heartbeat file is rewritten with the frames so far,
     // the observed frame rate and the process memory; the first call writes

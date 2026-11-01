@@ -103,6 +103,7 @@ final class LogExporter {
         appendSection(text, "logcat (this app)", null, captureLogcat());
         final File gameDir = new File(context.getFilesDir(), "game");
         appendFile(text, "game log.txt", new File(gameDir, "log.txt"), true);
+        appendFile(text, "modern-boot.txt", new File(gameDir, "modern-boot.txt"), false);
         appendFile(text, "modern-files.txt", new File(gameDir, "modern-files.txt"), false);
         appendFile(text, "modern-crash.txt", new File(gameDir, "modern-crash.txt"), false);
         appendFile(text, "modern-heartbeat.txt", new File(gameDir, "modern-heartbeat.txt"), false);

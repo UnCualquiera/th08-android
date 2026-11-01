@@ -592,6 +592,15 @@ bool ConfigureDataDirectory()
 
     if (directory != NULL && (directory[0] == '\0' || chdir(directory) != 0))
     {
+#if defined(__ANDROID__)
+        FILE *boot = fopen("modern-boot.txt", "w");
+        if (boot != NULL)
+        {
+            fprintf(boot, "status=failed stage=unable-to-enter-data-directory epoch=%lld\n",
+                    static_cast<long long>(time(NULL)));
+            fclose(boot);
+        }
+#endif
         fprintf(stderr, "th08-modern: unable to enter data directory: %s\n", directory);
         return false;
     }
@@ -599,6 +608,15 @@ bool ConfigureDataDirectory()
     struct stat info;
     if (stat("th08.dat", &info) != 0 || !S_ISREG(info.st_mode))
     {
+#if defined(__ANDROID__)
+        FILE *boot = fopen("modern-boot.txt", "w");
+        if (boot != NULL)
+        {
+            fprintf(boot, "status=failed stage=missing-th08-dat epoch=%lld\n",
+                    static_cast<long long>(time(NULL)));
+            fclose(boot);
+        }
+#endif
         fprintf(stderr, "th08-modern: selected directory does not contain th08.dat\n");
         return false;
     }
@@ -626,6 +644,15 @@ bool ConfigureDataDirectory()
         else
 #endif
         {
+#if defined(__ANDROID__)
+            FILE *boot = fopen("modern-boot.txt", "w");
+            if (boot != NULL)
+            {
+                fprintf(boot, "status=failed stage=data-directory-not-writable epoch=%lld\n",
+                        static_cast<long long>(time(NULL)));
+                fclose(boot);
+            }
+#endif
             fprintf(stderr, "th08-modern: data directory is not writable: %s\n", strerror(errno));
             return false;
         }
@@ -636,6 +663,15 @@ bool ConfigureDataDirectory()
             fprintf(stderr, "th08-modern: game data directory: %s\n", workingDirectory);
     }
     PreservePreviousHeartbeat();
+#if defined(__ANDROID__)
+    FILE *boot = fopen("modern-boot.txt", "w");
+    if (boot != NULL)
+    {
+        fprintf(boot, "status=starting stage=data-directory epoch=%lld\n",
+                static_cast<long long>(time(NULL)));
+        fclose(boot);
+    }
+#endif
     unlink("modern-files.txt");
     unlink("modern-crash.txt");
     unlink("modern-render.txt");
