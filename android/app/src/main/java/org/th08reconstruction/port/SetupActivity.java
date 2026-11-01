@@ -120,6 +120,12 @@ public class SetupActivity extends Activity {
         persistSettings();
     }
 
+    @Override
+    protected void onDestroy() {
+        worker.shutdownNow();
+        super.onDestroy();
+    }
+
     private void buildUi() {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);

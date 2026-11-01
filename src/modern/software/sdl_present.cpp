@@ -210,8 +210,14 @@ bool SdlSoftwarePresenter::Initialize(SDL_Window *window_, touch::Controls *cont
     // The Android and desktop builds both create the window with an OpenGL ES
     // / OpenGL context, so an accelerated renderer can reuse it. Fall back to
     // the software renderer when no accelerated driver is available.
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    if (renderer == NULL) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+    // VSync avoids wasting GPU/CPU time on frames the display cannot show.
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL)
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (renderer == NULL)
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL)
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (renderer == NULL)
     {
         fprintf(stderr, "th08-modern: SDL_CreateRenderer failed: %s\n", SDL_GetError());
@@ -441,7 +447,7 @@ void SdlSoftwarePresenter::Present(const unsigned char *pixels, int width, int h
     }
     else
     {
-        std::vector<unsigned char> staging(static_cast<size_t>(width) * height * 4);
+        staging.resize(static_cast<size_t>(width) * height * 4);
         for (int y = 0; y < height; ++y)
             memcpy(&staging[static_cast<size_t>(y) * width * 4], pixels + static_cast<size_t>(y) * pitch,
                    static_cast<size_t>(width) * 4);

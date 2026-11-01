@@ -13,6 +13,8 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Imports the picked game folder into app-private storage with progress.
@@ -98,8 +100,16 @@ final class GameFolderImporter {
 
         void bytes(long count) {
             if (!byBytes) return;
-            copiedBytes += count;
-            report((int) Math.min(100L, copiedBytes * 100L / totalBytes));
+            if (count > 0 && copiedBytes <= Long.MAX_VALUE - count) {
+                copiedBytes += count;
+            } else {
+                copiedBytes = totalBytes;
+            }
+            final long percent = copiedBytes < totalBytes
+                    ? ((copiedBytes / totalBytes) * 100L)
+                            + (((copiedBytes % totalBytes) * 100L) / totalBytes)
+                    : 100L;
+            report((int) Math.min(100L, percent));
         }
 
         void fileDone() {
@@ -132,7 +142,7 @@ final class GameFolderImporter {
         try {
             listener.stage(R.string.status_working);
             final List<Entry> entries = new ArrayList<>();
-            collect(tree, DocumentsContract.getTreeDocumentId(tree), "", entries);
+            collect(tree, DocumentsContract.getTreeDocumentId(tree), "", entries, new HashSet<String>());
 
             boolean foundData = false;
             for (Entry entry : entries) {
@@ -150,7 +160,12 @@ final class GameFolderImporter {
             long totalBytes = 0;
             for (Entry entry : entries) {
                 if (entry.size > 0) {
-                    totalBytes += entry.size;
+                    if (totalBytes <= Long.MAX_VALUE - entry.size) {
+                        totalBytes += entry.size;
+                    } else {
+                        totalBytes = 0;
+                        break;
+                    }
                 }
             }
 
@@ -163,10 +178,7 @@ final class GameFolderImporter {
             }
             listener.onProgress(100);
 
-            deleteRecursively(destination);
-            if (!staging.renameTo(destination)) {
-                throw new IOException("cannot move the staged copy into place");
-            }
+            swapStagedDirectory(staging, destination);
             return Result.ok(destination.getAbsolutePath());
         } catch (IOException e) {
             deleteRecursively(staging);
@@ -180,6 +192,21 @@ final class GameFolderImporter {
         }
     }
 
+    private static void swapStagedDirectory(File staging, File destination) throws IOException {
+        final File backup = new File(destination.getParentFile(), "game.old");
+        deleteRecursively(backup);
+        if (destination.exists() && !destination.renameTo(backup)) {
+            throw new IOException("cannot preserve the previous game copy");
+        }
+        if (!staging.renameTo(destination)) {
+            if (backup.exists() && !backup.renameTo(destination)) {
+                throw new IOException("cannot install the staged copy or restore the previous copy");
+            }
+            throw new IOException("cannot install the staged copy");
+        }
+        deleteRecursively(backup);
+    }
+
     private static String describe(Exception e) {
         final String message = e.getMessage();
         return message != null && !message.isEmpty() ? message : e.getClass().getSimpleName();
@@ -190,8 +217,8 @@ final class GameFolderImporter {
      * URI, path relative to the game root and reported size (negative when
      * the provider does not say).
      */
-    private void collect(Uri tree, String documentId, String relativePath, List<Entry> entries)
-            throws IOException {
+    private void collect(Uri tree, String documentId, String relativePath, List<Entry> entries,
+                         Set<String> seenPaths) throws IOException {
         final Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, documentId);
         try (Cursor cursor = resolver.query(children, new String[]{
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -211,14 +238,21 @@ final class GameFolderImporter {
                 final String id = cursor.getString(idIndex);
                 final String name = cursor.getString(nameIndex);
                 final String mime = cursor.getString(mimeIndex);
-                if (id == null || name == null || name.contains("/")) {
+                if (id == null || name == null || !isSafeDocumentName(name)) {
                     continue;
                 }
-                final String path =
-                        relativePath.isEmpty() ? name : relativePath + "/" + name;
+                String path = relativePath.isEmpty() ? name : relativePath + "/" + name;
+                final String lower = name.toLowerCase(Locale.US);
+                if (lower.equals("th08.dat")) {
+                    path = relativePath.isEmpty() ? "th08.dat" : relativePath + "/th08.dat";
+                } else if (lower.equals("thbgm.dat")) {
+                    path = relativePath.isEmpty() ? "thbgm.dat" : relativePath + "/thbgm.dat";
+                }
                 if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
-                    collect(tree, id, path, entries);
+                    collect(tree, id, path, entries, seenPaths);
                 } else if (isWantedDataFile(name)) {
+                    final String collisionKey = path.toLowerCase(Locale.US);
+                    if (!seenPaths.add(collisionKey)) continue;
                     final long size = sizeIndex >= 0 ? cursor.getLong(sizeIndex) : -1;
                     entries.add(new Entry(
                             DocumentsContract.buildDocumentUriUsingTree(tree, id), path, size));
@@ -245,6 +279,11 @@ final class GameFolderImporter {
                 }
             }
         }
+    }
+
+    private static boolean isSafeDocumentName(String name) {
+        return !name.isEmpty() && !name.equals(".") && !name.equals("..")
+                && !name.contains("/") && !name.contains("\\") && !name.contains("\0");
     }
 
     /** Only the files the game opens are imported: the two archives and any

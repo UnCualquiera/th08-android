@@ -373,10 +373,32 @@ class SoftwareDevice : public IDirect3DDevice8
         if (static_cast<int>(frame.size()) != width * height * 4)
             frame.resize(static_cast<size_t>(width) * height * 4);
         const UINT bytes = FormatBytes(backbuffer->format);
-        for (int y = 0; y < height; ++y)
-            for (int x = 0; x < width; ++x)
-                DecodePixel(&backbuffer->pixels[static_cast<size_t>(y) * backbuffer->pitch + x * bytes],
-                            backbuffer->format, &frame[(y * width + x) * 4]);
+        if (backbuffer->format == D3DFMT_A8R8G8B8 ||
+            backbuffer->format == D3DFMT_X8R8G8B8)
+        {
+            const bool alpha = backbuffer->format == D3DFMT_A8R8G8B8;
+            for (int y = 0; y < height; ++y)
+            {
+                const BYTE *sourceRow = &backbuffer->pixels[static_cast<size_t>(y) * backbuffer->pitch];
+                BYTE *targetRow = &frame[static_cast<size_t>(y) * width * 4];
+                for (int x = 0; x < width; ++x)
+                {
+                    const BYTE *source = sourceRow + x * 4;
+                    BYTE *target = targetRow + x * 4;
+                    target[0] = source[2];
+                    target[1] = source[1];
+                    target[2] = source[0];
+                    target[3] = alpha ? source[3] : 255;
+                }
+            }
+        }
+        else
+        {
+            for (int y = 0; y < height; ++y)
+                for (int x = 0; x < width; ++x)
+                    DecodePixel(&backbuffer->pixels[static_cast<size_t>(y) * backbuffer->pitch + x * bytes],
+                                backbuffer->format, &frame[(y * width + x) * 4]);
+        }
 
         ++presentCount;
         if (presenter != NULL) presenter->BeginFrame();

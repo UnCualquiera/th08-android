@@ -9,6 +9,7 @@
 
 #include "software_d3d8.hpp"
 #include "../touch/touch_controls.hpp"
+#include <vector>
 
 struct SDL_Window;
 struct SDL_Renderer;
@@ -76,6 +77,7 @@ class SdlSoftwarePresenter : public SoftwarePresenter
     bool hadFocus;
     bool fillScreen;
     unsigned char hadKeys[KeyHistorySize];
+    std::vector<unsigned char> staging;
 };
 
 // Feeds the virtual gamepad into the platform keyboard state so the

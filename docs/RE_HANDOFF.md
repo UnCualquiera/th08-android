@@ -17,6 +17,14 @@ Hardware gameplay, original-game-data launch, and a final signed release remain
 unverified. See [ANDROID_PORT.md](ANDROID_PORT.md) and
 `scripts/build-android.sh`.
 
+The Android maintenance pass on 2026-11-01 repaired staged-folder replacement,
+case-safe archive names, document-name traversal checks, duplicate-path handling,
+import byte progress overflow, and activity worker shutdown. The software presenter
+now reuses its pixel staging buffer, prefers VSync when available, and uses a
+32-bit backbuffer fast path. A debug APK built successfully with JDK 17, NDK
+28.2.13676358, Gradle 8.13, ARM64, ARMv7, and x86_64 targets; SHA-256
+`d2aed3e8a0617eb0694c944101f5b14536a6fce643a30f5346d5ac869b117a41`.
+
 The target is the original Japanese TH08 1.00d executable, size 840,704 bytes,
 SHA-256 `330fbdbf58a710829d65277b4f312cfbb38d5448b3df523e79350b879213d924`.
 
