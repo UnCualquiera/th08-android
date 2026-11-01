@@ -212,9 +212,12 @@ bool SdlSoftwarePresenter::Initialize(SDL_Window *window_, touch::Controls *cont
     // Explicitly testing the accelerated and software paths without VSync lets
     // the presenter fall back immediately instead of freezing the native loop.
 #if defined(__ANDROID__)
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    // Software is the most deterministic first-frame path across Android
+    // drivers. Accelerated rendering is deliberately tried second only if the
+    // software backend cannot attach to the SDL window.
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (renderer == NULL)
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 #else
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL)
@@ -449,7 +452,9 @@ void SdlSoftwarePresenter::Present(const unsigned char *pixels, int width, int h
     if (frame == NULL || frameWidth != width || frameHeight != height)
     {
         if (frame != NULL) SDL_DestroyTexture(frame);
-        frame = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING,
+        // Present() supplies packed RGBA bytes; this texture format must match
+        // that byte layout instead of silently swapping channels by name.
+        frame = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING,
                                   width, height);
         if (frame == NULL)
         {

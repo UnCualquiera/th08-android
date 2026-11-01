@@ -14,8 +14,11 @@ app-private writable game data, a CPU D3D8 compatibility layer, SDL presentation
 and configurable touch controls. Debug APK builds have passed for the native
 ARM64, ARMv7, and x86_64 targets, and `apksigner` verifies the produced APK.
 Hardware gameplay, original-game-data launch, and a final signed release remain
-unverified. See [ANDROID_PORT.md](ANDROID_PORT.md) and
-`scripts/build-android.sh`.
+unverified. The 2026-11-01 connected-device pass reached the D3D8 device and
+rendered a live title frame from the app-private imported game data, with frame
+heartbeats at 30.1 FPS in the native `MainActivity`. The title setup text now
+uses “Touhou 08 — Game setup” rather than PC-98-era wording. See
+[ANDROID_PORT.md](ANDROID_PORT.md) and `scripts/build-android.sh`.
 
 The Android maintenance pass on 2026-11-01 repaired staged-folder replacement,
 case-safe archive names, document-name traversal checks, duplicate-path handling,

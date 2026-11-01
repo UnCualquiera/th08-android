@@ -540,6 +540,23 @@ void StartStallWatchdog()
 } // namespace
 #endif
 
+void WriteAndroidBootStage(const char *status, const char *stage)
+{
+#if defined(__ANDROID__)
+    FILE *boot = fopen("modern-boot.txt", "w");
+    if (boot != NULL)
+    {
+        fprintf(boot, "status=%s stage=%s epoch=%lld\n",
+                status != NULL ? status : "unknown", stage != NULL ? stage : "unknown",
+                static_cast<long long>(time(NULL)));
+        fclose(boot);
+    }
+#else
+    (void)status;
+    (void)stage;
+#endif
+}
+
 bool ConfigureDataDirectory()
 {
     const char *directory = NULL;

@@ -102,6 +102,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR pCmdLine
     modern::InstallCrashReporter();
     if (!modern::ConfigureDataDirectory())
         return EXIT_FAILURE;
+    modern::WriteAndroidBootStage("starting", "engine-entry");
 #endif
 
     g_Supervisor.hInstance = hInstance;
@@ -123,27 +124,52 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR pCmdLine
 
     if (g_Supervisor.LoadConfig("th08.cfg") != ZUN_SUCCESS)
     {
+#ifdef TH08_MODERN_PORT
+        modern::WriteAndroidBootStage("failed", "load-config");
+#endif
         goto stop;
     }
+#ifdef TH08_MODERN_PORT
+    modern::WriteAndroidBootStage("starting", "config-loaded");
+#endif
 
     GameWindow::CalcExecutableChecksum();
     QueryPerformanceFrequency(&g_GameWindow.pcFrequency);
 
 restart:
+#ifdef TH08_MODERN_PORT
+    modern::WriteAndroidBootStage("starting", "d3d-interface");
+#endif
     if (GameWindow::InitD3DInterface())
     {
+#ifdef TH08_MODERN_PORT
+        modern::WriteAndroidBootStage("failed", "d3d-interface");
+#endif
         goto stop;
     }
-
+#ifdef TH08_MODERN_PORT
+    modern::WriteAndroidBootStage("starting", "create-window");
+#endif
     if (GameWindow::CreateGameWindow(hInstance))
     {
+#ifdef TH08_MODERN_PORT
+        modern::WriteAndroidBootStage("failed", "create-window");
+#endif
         goto stop;
     }
-
+#ifdef TH08_MODERN_PORT
+    modern::WriteAndroidBootStage("starting", "d3d-device");
+#endif
     if (GameWindow::InitD3DRendering())
     {
+#ifdef TH08_MODERN_PORT
+        modern::WriteAndroidBootStage("failed", "d3d-device");
+#endif
         goto stop;
     }
+#ifdef TH08_MODERN_PORT
+    modern::WriteAndroidBootStage("starting", "d3d-device-ready");
+#endif
 
     g_SoundPlayer.InitializeDSound(g_GameWindow.window);
     Controller::GetJoystickCaps();

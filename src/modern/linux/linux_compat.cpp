@@ -680,15 +680,10 @@ HWND CreateWindowExA(DWORD, LPCSTR, LPCSTR title, DWORD style, int, int, int wid
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)
     { fprintf(stderr, "th08-modern: SDL_Init failed: %s\n", SDL_GetError()); return NULL; }
 #if defined(TH08_SOFTWARE_RENDERER)
-    // The CPU back end presents through an SDL_Renderer, so the window needs no
-    // GL context of its own on the desktop. Android's SDL video backend has no
-    // window-surface path for the software renderer, so the GLES renderer that
-    // performs the final blit needs the context this flag creates at window
-    // creation; without it SDL would have to recreate the window mid-startup.
+    // Android's CPU software presenter uses an SDL window without an OpenGL
+    // context. Forcing an GLES context here caused some devices to block while
+    // creating the first frame, despite the CPU renderer not needing it.
     Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
-#if defined(__ANDROID__)
-    flags |= SDL_WINDOW_OPENGL;
-#endif
 #else
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
