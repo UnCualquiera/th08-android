@@ -9,6 +9,13 @@
 #include <stddef.h>
 #include <windows.h>
 
+// Serialized file structures keep their original byte contract on every
+// target. The Linux compatibility header supplies a distinct assertion in
+// native-layout builds; VC7 can use its normal compile-time C_ASSERT.
+#ifndef TH08_FILE_ASSERT
+#define TH08_FILE_ASSERT(e) C_ASSERT(e)
+#endif
+
 namespace th08
 {
 
@@ -25,9 +32,28 @@ namespace th08
     g_ZunMemory.RemoveFromRegistry(p);                                                                                 \
     delete p;                                                                                                          \
     p = NULL;
+#ifdef TH08_MODERN_PORT
+#define ZUN_DELETE_ARRAY(p)                                                                                            \
+    g_ZunMemory.RemoveFromRegistry(p);                                                                                 \
+    delete[] p;                                                                                                        \
+    p = NULL;
+#else
+// Preserve target scalar-delete emission for registered legacy arrays whose
+// current element types have trivial destruction.
+#define ZUN_DELETE_ARRAY(p) ZUN_DELETE(p)
+#endif
 #define ZUN_DELETE2(p)                                                                                                 \
     delete p;                                                                                                          \
     p = NULL;
+#ifdef TH08_MODERN_PORT
+#define ZUN_DELETE_ARRAY2(p)                                                                                           \
+    delete[] p;                                                                                                        \
+    p = NULL;
+#else
+// Preserve target scalar-delete emission for unregistered legacy arrays whose
+// current element types have trivial destruction.
+#define ZUN_DELETE_ARRAY2(p) ZUN_DELETE2(p)
+#endif
 
 #define ZUN_FREE(p)                                                                                                    \
     g_ZunMemory.Free(p);                                                                                               \
@@ -191,7 +217,7 @@ void ResetKeyboard();
 namespace FileSystem
 {
 LPBYTE Decrypt(LPBYTE inData, i32 size, u8 xorValue, u8 xorValueInc, i32 chunkSize, i32 maxBytes);
-LPBYTE TryDecryptFromTable(LPBYTE inData, LPINT unused, i32 size);
+LPBYTE TryDecryptFromTable(LPBYTE inData, LPINT fileSize, i32 size);
 LPBYTE Encrypt(LPBYTE inData, i32 size, u8 xorValue, u8 xorValueInc, i32 chunkSize, i32 maxBytes);
 LPBYTE OpenFile(LPCSTR path, i32 *fileSize, BOOL isExternalResource);
 BOOL CheckIfFileAlreadyExists(LPCSTR path);
@@ -243,6 +269,9 @@ class Rng
     f32 GetRandomF32Signed();
 
     void ResetGenerationCount();
+#ifdef TH08_ENABLE_REPLAY_TRACE
+    u32 ReplayTraceGenerationCount() const { return generationCount; }
+#endif
     void SetSeed(u16 newSeed);
     u16 GetSeed();
 

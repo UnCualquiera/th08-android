@@ -1,9 +1,16 @@
 # Download, install, and play on Linux
 
 The native Linux reconstruction is the current playable release target. The
-release includes the established 32-bit x86 product and a native-layout x86_64
-product; an AArch64 build is available for hardware validation. Wine, Docker,
-and the original `th08.exe` are not runtime requirements.
+release lane includes the established 32-bit x86 product and a native-layout
+x86_64 product; an AArch64 build is available for hardware validation. Wine,
+Docker, and the original `th08.exe` are not runtime requirements.
+
+Release v0.2.1 refreshes all three packages after the native Windows i386
+prerequisite recovered shared source-ownership and initialization defects. It
+also adds bounded optimization and memory-safety repairs to the handwritten
+native-layout compatibility code. These changes do not alter the exact-facing
+VC7 source path or make the experimental AArch64 package a gameplay-validated
+product.
 
 This is the release-package guide. The
 [source-checkout instructions](#build-and-run-from-a-source-checkout) below
@@ -132,6 +139,18 @@ After the initial setup, use the incremental path:
 ```bash
 scripts/play-modern-linux.sh "/path/to/original/TH08 directory"
 ```
+
+Those commands retain the fixed-layout i386 product. For native ELF64 PIE,
+build and verify with:
+
+```bash
+scripts/build-portable-linux.sh x86_64
+scripts/build-portable-linux.sh aarch64
+```
+
+The AArch64 command cross-builds on x86_64 when the documented arm64
+development packages are installed. See [Native 64-bit Linux
+port](PORTABLE_64BIT.md) for package, launch, and smoke-test commands.
 
 An optional Docker environment provides reproducible builds; the resulting
 game runs directly on the host. See [Native Linux playable

@@ -1049,6 +1049,13 @@ ZunResult Background::DeletedCallback(Background *background)
         g_ZunMemory.Free(background->stageObjectVms);
         background->stageObjectVms = NULL;
     }
+#ifdef TH08_PORTABLE_NATIVE_LAYOUT
+    if (background->stageObjects != NULL)
+    {
+        g_ZunMemory.Free(background->stageObjects);
+        background->stageObjects = NULL;
+    }
+#endif
     if (!IsDisableResourceReload() && background->stageData != NULL)
     {
         g_ZunMemory.Free(background->stageData);
@@ -1086,6 +1093,25 @@ ZunResult Background::LoadStageData(const char *path)
 
     this->stageObjectCount = this->stageData->objectCount;
     this->stageQuadCount = this->stageData->quadCount;
+#ifdef TH08_PORTABLE_NATIVE_LAYOUT
+    this->stageObjectInstances = reinterpret_cast<RawStageObjectInstance *>(
+        reinterpret_cast<u8 *>(this->stageData) + this->stageData->objectInstancesOffset);
+    this->stageScript = reinterpret_cast<RawStageInstr *>(
+        reinterpret_cast<u8 *>(this->stageData) + this->stageData->scriptOffset);
+    this->stageObjects = reinterpret_cast<RawStageObject **>(
+        g_ZunMemory.Alloc(this->stageObjectCount * sizeof(*this->stageObjects), "stage object table"));
+    if (this->stageObjects == NULL)
+    {
+        return ZUN_ERROR;
+    }
+    const u32 *stageObjectOffsets = reinterpret_cast<const u32 *>(
+        reinterpret_cast<u8 *>(this->stageData) + sizeof(RawStageHeader));
+    for (i = 0; i < this->stageObjectCount; i++)
+    {
+        this->stageObjects[i] = reinterpret_cast<RawStageObject *>(
+            reinterpret_cast<u8 *>(this->stageData) + stageObjectOffsets[i]);
+    }
+#else
     this->stageObjectInstances = reinterpret_cast<RawStageObjectInstance *>(
         this->stageData->objectInstancesOffset + (i32)this->stageData);
     this->stageScript = reinterpret_cast<RawStageInstr *>(
@@ -1101,6 +1127,7 @@ ZunResult Background::LoadStageData(const char *path)
                 (RawStageObject *)((i32)this->stageObjects[i] + (i32)this->stageData);
         }
     }
+#endif
 
     this->stageObjectVms = reinterpret_cast<AnmVm *>(
         g_ZunMemory.Alloc(this->stageQuadCount * sizeof(AnmVm), "bgscroll"));

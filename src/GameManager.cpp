@@ -17,6 +17,9 @@
 #include "ScreenEffect.hpp"
 #include "SoundPlayer.hpp"
 #include "Spellcard.hpp"
+#ifdef TH08_ENABLE_REPLAY_TRACE
+#include "modern/linux/replay_trace.hpp"
+#endif
 
 namespace th08
 {
@@ -283,6 +286,9 @@ ChainCallbackResult GameManager::OnUpdate(GameManager *gameManager)
     u32 value;
     u32 antiTamperIdx;
 
+#ifdef TH08_ENABLE_REPLAY_TRACE
+    modern::ReplayTraceBeginCalculation();
+#endif
     g_GameManager.playtimeFrames++;
 
     if (gameManager->flags.stageTransitionState != 0)
@@ -323,7 +329,7 @@ ChainCallbackResult GameManager::OnUpdate(GameManager *gameManager)
                 stage = 0;
                 for (stageIdx = g_GameManager.currentStage + 1; stageIdx < MAX_STAGES; stageIdx++)
                 {
-                    if (static_cast<ZunBool>(g_ReplayManager->replayData->header.stageReplayData[stageIdx] != NULL))
+                    if (static_cast<ZunBool>(TH08_REPLAY_STAGE_DATA(g_ReplayManager->replayData, stageIdx) != NULL))
                     {
                         stage = stageIdx;
                         break;
@@ -731,7 +737,11 @@ void __fastcall GameManager::GameplaySetupThread(void *unused)
         }
 
         size = g_Rng.GetRandomU32InRange(0xffff) + 16;
+#ifdef TH08_PORTABLE_NATIVE_LAYOUT
+        gameManager->antiTamperHeapJitterAllocation = malloc(size);
+#else
         gameManager->antiTamperHeapJitterAllocation = reinterpret_cast<i32>(malloc(size));
+#endif
         newCfg = static_cast<GameConfiguration *>(operator new(sizeof(GameConfiguration)));
         gameManager->cfg = newCfg;
         newGlobals = static_cast<ZunGlobals *>(operator new(sizeof(ZunGlobals)));

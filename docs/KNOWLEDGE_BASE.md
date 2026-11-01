@@ -19,6 +19,7 @@ ledgers.
 | Semantic field/type recovery and two-oracle acceptance | [SEMANTIC_RECONSTRUCTION.md](SEMANTIC_RECONSTRUCTION.md) | Evidence classes, bounded batch format, typed-layout rules, and VC7/portable validation matrix. |
 | Semantic/readability method for later titles | [SEMANTIC_PLAYBOOK.md](SEMANTIC_PLAYBOOK.md) | Consumer closure, four ownership axes, naming stop rules, protocol audit, Oracle escalation, and the cross-title transfer contract. |
 | Completed semantic batches | [SEMANTIC_HISTORY.md](SEMANTIC_HISTORY.md) | Chronological observed/corroborated/inferred evidence and Oracle results. |
+| Portable visual regression and replay-driven framebuffer probes | [RENDER_AUDIT.md](RENDER_AUDIT.md) | Versioned CSV contract, structural/pixel acceptance policy, and backend adapter boundary. |
 | Command selection and scratch lifecycle | [TOOLS.md](TOOLS.md) | Public entry points, copyable recipes, and tool limits. |
 | Exact authored totals | [PROGRESS.md](PROGRESS.md) and [config/matches.csv](../config/matches.csv) | Generated totals and accepted per-address evidence. |
 | Target mappings and types | [config/mapping.csv](../config/mapping.csv), `config/reccmp-*.csv` | Imported/reconciled leads; mapping alone is not exactness. |

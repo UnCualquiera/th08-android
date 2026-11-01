@@ -25,7 +25,7 @@ and macOS runtime work have their own platform guides.
 
 ## Completed replay validation
 
-The native VC7, Linux x86_64, and Linux i386 products each pass all 108 credited
+The published baseline native VC7, Linux x86_64, and Linux i386 products each pass all 108 credited
 recordings and 12,311,460 calculations. All 25 fields, recorded stage-end
 scores, natural replay exits, and published fingerprints agree with retail.
 The native gate used fresh cold builds and fresh paired captures. Both portable
@@ -80,42 +80,110 @@ remove owned temporary runtimes and compiler trees after their checks finish.
 A changed executable, observer, schema, assets, or playback profile requires a
 new replay output directory.
 
+## Latest validation checkpoint
+
+The replay and laser repair batch is merged into `port/portable-64bit` through
+[PR #32](https://github.com/N0zoM1z0/th08/pull/32), checkpoint `c7d27932`.
+It includes main PR #31. All 440 existing non-document inputs remain unchanged
+after that history integration; the final 1,106-unit single-job cold comparison
+and repository CI pass. The tested
+GCC 8 x86_64 recorder is
+`e0a57a43520524713b70dbaa38329155fd6ab4a09006869b4f09db8dbcc27649`, built
+from source checkpoint `897decb2`. All 132 recorded build-input hashes agree
+after LF normalization. Evidence is under
+`build/laser-spawn-origin-20261014/production-final/`.
+
+The ECL opcode 32/33 repair passes 390 paired spawn-input records and seven
+Final B laser/VM packets. All seven images pass the original beam limit.
+The complete 108-recording gate and retained-evidence verification pass under
+`build/laser-spawn-origin-20261014/x64-suite/`: 12,311,460 calculations, all
+25 fields, scores, fingerprints and natural exits agree. All temporary
+runtimes are removed, and equal traces share reference storage. Earlier
+full-corpus results apply to their published products, as recorded in
+[REPLAY_RESULTS.md](REPLAY_RESULTS.md).
+
+The native backport is on `fix/native-spell-background-owner`, checkpoint
+`5dfd5197`, in `.analysis/native-main-owner-20261014/`. All three affected
+units and the full 1,106-unit cold gate pass. Fresh normal and bugfix links
+pass the owner/data/callee checks. The new bugfix product is
+`9e699dd2c596acb090a5d44e9aa32b6c0bb19f0d5e11fe6a0babb0eb1469fd9b`.
+Its five fresh Final A captures at clock rate 1, with rasterization and
+`csmt=0`, have identical retail laser/VM packets and pixel-identical complete
+playfields. The paired 22,590-calculation diagnostic prefix agrees on all
+25 fields. Its full native replay gate and separate retained-evidence pass
+also pass all 108 recordings and 12,311,460 calculations, with matching fields,
+scores, fingerprints and completion boundaries. The native backport is merged
+in [PR #31](https://github.com/N0zoM1z0/th08/pull/31), main checkpoint `08c7f00f`.
+Products and reports are under `build/laser-native-20261014/main-production/`
+and `main-finala-paired/`.
+
+The two-checkout cold gates also verify the anonymous-namespace comparison
+repair. The comparator normalizes only VC7's generated discriminator and
+records the actual COFF names. Ambiguity, signature, extent and relocation
+checks remain strict. The controlled two-path compiler experiment and ten
+contract tests are documented in [RE_WORKFLOW.md](RE_WORKFLOW.md).
+
+The i386 refresh is prepared under `build/laser-i386-refresh-20261014/`.
+Its fresh GCC 12 ELF32 recorder is
+`bd8b148c0ac6a478391ee4c1fea7334ac1f473466418131715cda4e1a900ce40`, built
+from `ed8ff8df`. All 132 recorded build-input hashes agree. It includes the
+script-owner, font, surface-filter and ECL trigonometry repairs. ELF32/fixed
+layout verification and all 640 default-context surface API cases pass. Seven
+renderer/FPU contract groups pass in each of the default and forced OpenGL 2.1
+contexts. All seven Final B
+image/raw-state checks and 390 paired spawn inputs pass in each context. The
+`finalb-kaguya` manifest pins the original state file and passes retained checks
+for x86_64 and both i386 contexts. The complete 108-recording corpus and
+separate retained-evidence pass also succeed: 12,311,460 calculations agree
+on all 25 fields, scores, fingerprints and natural exits. All temporary
+runtimes are removed; equal traces share reference storage. Evidence is under
+`full-suite/`, `full-suite-revalidation.log` and `full-suite-audit.json` in that
+phase directory. CMake, package discovery and
+Ninja run together inside the borrowed GCC 12 container, limited to one CPU,
+768 MiB and one job. The compiler tree has been removed. Use the container
+commands in [PORTABLE_REPLAY_TESTING.md](PORTABLE_REPLAY_TESTING.md) to reproduce
+that environment.
+The earlier i386 product's results remain in
+[PORTABLE_LASER_VISUALS.md](PORTABLE_LASER_VISUALS.md#i386-refresh-october-14-2026).
+
+A serial worker completed the x86_64, new native and refreshed i386
+108-recording gates and all three retained-evidence passes. Product hashes are
+pinned. The owned native Wine prefix was removed after native verification,
+before i386 captures began. The completed worker's state is under
+`build/laser-i386-refresh-20261014/queued-platform-gates.json`.
+Four Extra startup/active/despawn frames now pass against
+retail, with exact laser/VM packets and beam errors 0.001472–0.004902. The
+`extra-mokou` case pins their retail state hash; evidence is under
+`build/laser-extra-20261014/paired/`. The second serial worker also completed
+the refreshed i386 Stage 3, Stage 4B, Final A and Extra cases in default and
+OpenGL 2.1 contexts. All eight groups and 34 new image/raw-state checks pass,
+including separate retained comparisons. With Final B, each context covers
+24 selected frames. Candidate, observer, comparator, case-manifest and
+reference hashes remain pinned. Its completed state is in
+`build/laser-i386-refresh-20261014/queued-scene-gates.json`; evidence is under
+`scene-default-*/` and `scene-legacy-*/` in the same directory. All temporary
+game runtimes are removed. Tested binaries, source/build provenance and
+compressed comparison evidence remain under their recorded phase directories.
+
 ## Next bounded work
 
-The native spell-background owner repair is prepared on
-`fix/native-spell-background-owner`, based on main checkpoint `4fe9ce61`.
-Canonical target observations show seven writes and one read at
-`Background + 0xB34 = 0x004E4B64`. Source and relocation entries now select
-that shared field. All three affected units and the full 1,106-unit cold
-comparison pass. Fresh normal and bugfix links pass the seven-write/one-read
-owner guard and the existing linked-data/callee checks.
+Continue the measured title and boundary-sampling residuals in
+[the laser report](PORTABLE_LASER_VISUALS.md#remaining-sampling-and-title-error).
+Start with the retained, unmodified quad inputs and their D3D8/OpenGL API
+control; the selected gameplay images already pass their recorded thresholds.
+Issue #20's reported scene remains unspecified. Small font/sampling residuals,
+the Stage 5 color observations and native RT-007 retain their measured scope
+in the laser, rendering and runtime reports. AArch64 hardware and audio are
+separate checks; web work remains deferred.
 
-The independent worktree exposed VC7 anonymous-namespace names that change
-with source paths. The comparator now preserves complete decorated signatures
-while normalizing only the generated namespace discriminator; ambiguous
-matches are rejected. Both this worktree and the portable source checkpoint
-pass cold comparisons. A controlled two-path compiler probe confirms identical
-source and function bytes with different discriminators. The new bugfix product
-`9e699dd2c596acb090a5d44e9aa32b6c0bb19f0d5e11fe6a0babb0eb1469fd9b`
-passes five fresh paired Final A captures at clock rate 1 with rasterization
-and `csmt=0`. All raw laser/VM packets agree, and all five complete playfields
-are pixel-identical to retail. The 22,590-calculation diagnostic prefix agrees
-on all 25 fields. Its full native replay gate and separate retained-evidence
-verification now pass all 108 recordings and 12,311,460 calculations. All
-25 fields, published fingerprints, stage-end scores and replay completion
-boundaries agree with retail. Captures use clock rate 128, no rasterization,
-and the ptrace observer against validated retail references. Evidence is under
-`build/laser-native-20261014/main-full-state128/`; temporary runtimes and the
-owned Wine prefix are removed. Keep these products distinct from the earlier
-published binaries.
-
-For runtime work, select a concrete remaining visual or hardware scenario and
-retain the stage, route, recording, frame, and comparison evidence. For exact
-reconstruction, resume the authored near match or one bounded whole-link/library
-dependency. The ANM semantic queue keeps opcodes 25, 31, and 88 neutral until
-complete TH08 consumer evidence supports a shared-layout rename.
+Detailed prior checkpoints are preserved in the
+[laser session archive](RE_HANDOFF_HISTORY.md#laser-validation-checkpoints-before-the-final-platform-refresh-october-14-2026).
+For exact reconstruction, the sole authored near match and bounded whole-link
+or library work remain independent of these runtime gates. The ANM semantic
+queue keeps opcodes 25, 31 and 88 neutral until complete TH08 consumer evidence
+supports a shared-layout rename.
 
 <a id="documentation-batch-for-local-review"></a>
 
-The completed human/agent documentation batch and earlier repair investigations
-are retained in the [handoff archive](RE_HANDOFF_HISTORY.md#native-replay-handoff--2026-10-11).
+The completed human/agent documentation batch is retained in the
+[handoff archive](RE_HANDOFF_HISTORY.md#replay-investigation-handoff--2026-10-13).

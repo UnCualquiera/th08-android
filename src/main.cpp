@@ -1,6 +1,9 @@
 #define _WIN32_WINNT 0x0500
 
 #include "th_pch.h"
+#ifdef TH08_ENABLE_REPLAY_TRACE
+#include "modern/linux/replay_trace.hpp"
+#endif
 
 #include "AnmManager.hpp"
 #include "Background.hpp"
@@ -307,6 +310,13 @@ stop:
 RenderResult GameWindow::Render()
 {
     i32 calcChainResult;
+#ifdef TH08_ENABLE_REPLAY_TRACE
+    if (modern::ReplayTraceShouldExit())
+    {
+        g_Supervisor.ThreadClose();
+        return RENDER_RESULT_EXIT_SUCCESS;
+    }
+#endif
 
     this->curTimestamp = this->GetTimestamp();
 
@@ -423,6 +433,12 @@ f64 GameWindow::GetTimestamp()
 {
     LARGE_INTEGER performanceCounterValue;
     f64 timestamp;
+
+#ifdef TH08_MODERN_PORT
+    const char *fastReplay = getenv("TH08_RENDER_AUDIT_FAST");
+    if (fastReplay != NULL && fastReplay[0] != '\0' && strcmp(fastReplay, "0") != 0)
+        return this->lastFrameTime + (1.0 / 60.0);
+#endif
 
     if (g_GameWindow.pcFrequency.LowPart != 0)
     {
@@ -1000,7 +1016,12 @@ ZunResult GameWindow::CheckForRunningGameInstance(HINSTANCE hInstance)
     }
 
     startupInfo.cb = sizeof(startupInfo);
+#ifdef TH08_PORTABLE_NATIVE_LAYOUT
+    memset(&startupInfo.lpReserved, 0,
+           sizeof(startupInfo) - offsetof(STARTUPINFO, lpReserved));
+#else
     memset(&startupInfo.lpReserved, 0, sizeof(startupInfo) - 4); // Fill remaining struct members
+#endif
 
     // GetModuleFileNameA will get the absolute path of the TH08 executable
     // GetConsoleTitleA will always fail(?) because TH08 isn't a console application. consoleTitleBuf is clobbered
@@ -1148,7 +1169,11 @@ ZunBool GameWindow::ResolveIt(char *shortcutPath, char *dstPath, i32 maxPathLen)
                 }
             }
 
+#ifdef TH08_MODERN_PORT
+            delete[] wPath;
+#else
             delete wPath;
+#endif
             ppf->Release();
         }
 

@@ -184,6 +184,69 @@ DIFFABLE_STATIC_ASSIGN(const char *, g_FullWidthDigits[]) = {
 
 DIFFABLE_STATIC_ARRAY(char, 64, g_FullWidthNumberBuffer);
 
+#ifdef TH08_MODERN_PORT
+static bool StartDeveloperReplayIfRequested()
+{
+    static bool requestConsumed = false;
+    const char *replayPath = getenv("TH08_AUTOPLAY_REPLAY");
+    if (requestConsumed || replayPath == NULL || replayPath[0] == '\0')
+        return false;
+    requestConsumed = true;
+
+    i32 fileSize = 0;
+    ReplayData *replay = reinterpret_cast<ReplayData *>(
+        FileSystem::OpenFile(replayPath, &fileSize, TRUE));
+    replay = ReplayManager::LoadReplayData(replay, fileSize);
+    if (replay == NULL)
+    {
+        utils::DebugPrint("error : developer replay could not be loaded: %s\r\n", replayPath);
+        g_Supervisor.curState = SupervisorState_ExitGame;
+        return true;
+    }
+
+    int stage = 0;
+    const char *stageValue = getenv("TH08_AUTOPLAY_STAGE");
+    if (stageValue != NULL && stageValue[0] != '\0')
+        stage = atoi(stageValue);
+    if (stage < 0 || stage >= MAX_STAGES)
+    {
+        utils::DebugPrint("error : developer replay stage index is out of range: %s\r\n",
+                          stageValue != NULL ? stageValue : "0");
+        g_ZunMemory.Free(replay);
+        g_Supervisor.curState = SupervisorState_ExitGame;
+        return true;
+    }
+    while (stage < MAX_STAGES && TH08_REPLAY_STAGE_DATA(replay, stage) == NULL)
+        ++stage;
+    if (stage >= MAX_STAGES)
+    {
+        utils::DebugPrint("error : developer replay has no playable stage at index %s\r\n",
+                          stageValue != NULL ? stageValue : "0");
+        g_ZunMemory.Free(replay);
+        g_Supervisor.curState = SupervisorState_ExitGame;
+        return true;
+    }
+
+    g_GameManager.SetIsReplayWeird(TRUE);
+    strncpy(g_GameManager.replayFilename, replayPath,
+            sizeof(g_GameManager.replayFilename) - 1);
+    g_GameManager.replayFilename[sizeof(g_GameManager.replayFilename) - 1] = '\0';
+    g_GameManager.difficulty = replay->difficulty;
+    g_GameManager.shotType = replay->shotType;
+    g_GameManager.flags.isDemoMode = FALSE;
+    g_GameManager.flags.isPracticeMode = FALSE;
+    g_GameManager.flags.isSpellPractice = replay->spellcardNumber >= 0;
+    g_GameManager.currentSpellCardNumber = replay->spellcardNumber;
+    g_GameManager.currentStage = stage;
+    g_GameManager.replayMode = REPLAY_MODE_NORMAL;
+    g_ZunMemory.Free(replay);
+
+    g_Supervisor.curState = SupervisorState_GameManager;
+    g_Supervisor.StopAudio();
+    return true;
+}
+#endif
+
 DIFFABLE_STATIC_ASSIGN(const char *, g_StartMenuHelpText[]) = {
     TH_TITLE_STARTMENU_HELPTEXT0, TH_TITLE_STARTMENU_HELPTEXT1, TH_TITLE_STARTMENU_HELPTEXT2,
     TH_TITLE_STARTMENU_HELPTEXT3, TH_TITLE_STARTMENU_HELPTEXT4, TH_TITLE_STARTMENU_HELPTEXT5,
@@ -380,6 +443,10 @@ ChainCallbackResult TitleScreen::OnUpdateStartMenu()
         this->currentScreenState = TitleCurrentScreenState_Ready;
         this->startMenuIdleFrames = 0;
     case TitleCurrentScreenState_Ready:
+#ifdef TH08_MODERN_PORT
+        if (StartDeveloperReplayIfRequested())
+            return CHAIN_CALLBACK_RESULT_CONTINUE_AND_REMOVE_JOB;
+#endif
         i = this->MoveCursorVertical(9);
         if (i != 0)
         {
@@ -459,7 +526,7 @@ ChainCallbackResult TitleScreen::OnUpdateStartMenu()
 
                 i = 0;
 
-                while (this->currentReplay->header.stageReplayData[i] == NULL)
+                while (TH08_REPLAY_STAGE_DATA(this->currentReplay, i) == NULL)
                 {
                     i++;
                 }
@@ -610,7 +677,7 @@ ChainCallbackResult TitleScreen::OnUpdateStartMenu()
     case TitleCurrentScreenState_Exit:
         if (stateTimer >= 60)
         {
-            ZUN_DELETE2(this->vms);
+            ZUN_DELETE_ARRAY2(this->vms);
             // Yes, this->vms is set to NULL twice.
             this->vms = NULL;
 
@@ -2642,10 +2709,10 @@ ChainCallbackResult TitleScreen::DrawReplayMenu()
 
                 position = vm->pos;
 
-                if (this->currentReplay->header.stageReplayData[i2] != NULL)
+                if (TH08_REPLAY_STAGE_DATA(this->currentReplay, i2) != NULL)
                 {
                     g_AsciiManager.AddFormatText(&position, "%s %9d0", g_StageNames[i2],
-                                                 this->currentReplay->header.stageReplayData[i2]->score);
+                                                 TH08_REPLAY_STAGE_DATA(this->currentReplay, i2)->score);
                 }
                 else
                 {
@@ -3368,6 +3435,7 @@ ChainCallbackResult TitleScreen::OnUpdateReplayMenu()
                 (ReplayData *)FileSystem::OpenFile(this->replayFilePaths[this->selectedReplay], &fileSize2, TRUE);
             this->currentReplay = ReplayManager::LoadReplayData(this->currentReplay, fileSize2);
 
+#ifndef TH08_PORTABLE_NATIVE_LAYOUT
             for (i = 0; i < MAX_STAGES; i++)
             {
                 if (this->currentReplay->header.stageReplayData[i] != NULL)
@@ -3377,10 +3445,11 @@ ChainCallbackResult TitleScreen::OnUpdateReplayMenu()
                                             (u32)this->currentReplay->header.stageReplayData[i]);
                 }
             }
+#endif
 
             this->cursor = 0;
 
-            while (this->replays[this->selectedReplay].header.stageReplayData[this->cursor] == NULL)
+            while (TH08_REPLAY_STAGE_DATA(&this->replays[this->selectedReplay], this->cursor) == NULL)
             {
                 this->cursor++;
                 if (this->cursor > EXTRASTAGE)
@@ -3423,7 +3492,7 @@ ChainCallbackResult TitleScreen::OnUpdateReplayMenu()
         i = this->MoveCursorVertical(9);
         if (i < 0)
         {
-            while (this->replays[this->selectedReplay].header.stageReplayData[this->cursor] == NULL)
+            while (TH08_REPLAY_STAGE_DATA(&this->replays[this->selectedReplay], this->cursor) == NULL)
             {
                 this->cursor--;
                 if (this->cursor < 0)
@@ -3434,7 +3503,7 @@ ChainCallbackResult TitleScreen::OnUpdateReplayMenu()
         }
         else if (i > 0)
         {
-            while (this->replays[this->selectedReplay].header.stageReplayData[this->cursor] == NULL)
+            while (TH08_REPLAY_STAGE_DATA(&this->replays[this->selectedReplay], this->cursor) == NULL)
             {
                 this->cursor++;
                 if (this->cursor >= ARRAY_SIZE(g_StageNames))
@@ -3909,7 +3978,7 @@ ZunResult TitleScreen::Release()
 
     if (this->vms != NULL)
     {
-        ZUN_DELETE2(this->vms);
+        ZUN_DELETE_ARRAY2(this->vms);
         /* Again, double NULL set. */
         this->vms = NULL;
     }

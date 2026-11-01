@@ -48,6 +48,17 @@ scripts/build-modern-linux.sh
 scripts/run-modern-linux.sh "/path/to/the/original/TH08 directory"
 ```
 
+The native-layout 64-bit products have a separate build entry point so the
+fixed-layout i386 release remains regression-testable:
+
+```bash
+scripts/build-portable-linux.sh x86_64
+scripts/build-portable-linux.sh aarch64
+```
+
+See [Native 64-bit Linux port](PORTABLE_64BIT.md) for dependency, packaging,
+wire-format, and runtime-verification details.
+
 The selected directory becomes the process working directory. The original
 relative-file behavior therefore reads and writes configuration, score,
 replay, screenshots, and diagnostic files there. The original executable is
@@ -100,6 +111,10 @@ so the executable bit and the expected launcher/binary layout survive download
 and extraction. `scripts/package-modern-linux.sh` creates the same artifact
 locally from any verified `th08-modern` ELF.
 
+The workflow also builds x86_64 and AArch64 ELF64 PIE in an architecture
+matrix. It rejects fixed-address TH08 globals in those binaries and publishes
+`th08-portable-linux-x86_64` and `th08-portable-linux-aarch64` artifacts.
+
 ### Other distributions and isolated builds
 
 Automatic package installation currently supports Debian and Ubuntu on x86 or
@@ -127,6 +142,9 @@ Useful development overrides are:
 | `TH08_LINUX_BUILD_JOBS` | Parallel build job count; defaults to one |
 | `TH08_LINUX_BINARY` | Executable selected by `run-modern-linux.sh` |
 | `TH08_LINUX_PKG_CONFIG_LIBDIR` | i386-only pkg-config search path |
+| `TH08_PORTABLE_BUILD_DIR` | Repository-relative x86_64/AArch64 build directory |
+| `TH08_PORTABLE_BUILD_JOBS` | Native-layout parallel build count; defaults to one |
+| `TH08_PORTABLE_PKG_CONFIG_LIBDIR` | Architecture-specific native-layout pkg-config path |
 | `TH08_FONT` | Explicit readable Japanese font file |
 
 ## Port boundary
@@ -142,7 +160,10 @@ under `src/modern/linux/` and selected only by the independent CMake product:
 - SDL_ttf, Fontconfig, and CP932-to-UTF-8 conversion implement the GDI text
   boundary used for Japanese dialogue and dynamic labels;
 - a non-PIE i386 ELF plus `th08-layout.ld` preserves target-owned data
-  addresses that reconstructed source still references directly.
+  addresses that reconstructed source still references directly;
+- x86_64 and AArch64 are PIE and resolve serialized 32-bit offsets into native
+  pointer tables while expressing overlapping target symbols as aggregate
+  fields rather than absolute linker aliases.
 
 Implement backend fixes at the platform API or link boundary where possible,
 so the recovered gameplay source stays shared with VC7 builds.
@@ -276,12 +297,60 @@ memory and no 3D acceleration, making initial software-rendered calibration
 unusually slow, but the game started and ran. A physical Linux desktop with
 hardware OpenGL would extend the recorded WSLg and Kali coverage.
 
+The native-layout x86_64 PIE completed a user-driven Sakuya/Remilia Lunatic
+route under WSLg: Stages 1 through 6A, the ending, results, and return to title.
+The Stage 4-to-5 transition that had failed in an earlier fixed-layout build
+completed normally. Isolated Xvfb/Mesa smoke tests still cover the bundled
+Stage 5 demo, while replay-driven render audits can start a selected recorded
+stage and compare enemy ANM source regions with the pixels changed by each draw.
+The AArch64 PIE has been cross-linked exclusively against arm64 libraries and
+reaches DAT/version/logo/loading initialization under QEMU user-mode. Emulated
+software OpenGL is too slow here to represent a real-hardware gameplay result.
+
+### Native clears and render oracles
+
+Serialized records keep target wire sizes, but bulk initialization of live
+objects must use the selected runtime layout. A fixed 32-bit `memset` size can
+compile and survive startup on x86_64 while silently leaving pointer-expanded
+tail fields stale. The resulting failure may appear much later—for example, an
+uncleared enemy timeline prevented natural stage transitions. Keep the target
+constant in the exact/fixed-layout branch and use `sizeof` only for the native
+layout.
+
+Visual diagnostics should separate three questions instead of relying on a
+screenshot alone:
+
+1. Does the VM reference a loaded sprite and texture with valid geometry?
+2. Does the source UV region contain visible pixels after the VM/global ANM
+   color modulation is applied?
+3. Does flushing that exact draw change the expected framebuffer region?
+
+`TH08_RENDER_AUDIT=1` enables this sampled oracle, and
+`scripts/audit-render-replay-linux.sh` combines it with a user replay and
+software-rendered Xvfb session. The CSV preserves stage/frame, enemy and boss
+identity, ANM script/sprite, both VM colors, selected render color, texture
+statistics, and framebuffer deltas. This makes missing assets, stale pointers,
+off-screen draws, scripted fades, and post-texture rendering failures distinct
+enough to triage without watching an entire route.
+See [Replay-driven render audit](RENDER_AUDIT.md) for the schema and the small
+backend contract intended for reuse by later ports. Its cross-report comparator
+aligns the same replay frames across architectures without requiring identical
+edge rasterization.
+
+Do not preserve a multi-field value by casting the address of one scalar local
+to an aggregate pointer. VC7 `#pragma var_order` can make adjacent floats act
+like a `Float2`, but a modern compiler may separate or reverse those locals.
+`EnemyManager::OnDrawImpl` requires a real portable `Float2` when saving and
+restoring the scale around trail drawing; otherwise x86_64 can restore NaN as
+the Y scale and make a valid boss texture disappear. Keep the scalar source
+shape only in the target comparison branch.
+
 ## Current limitations
 
 - MIDI output is a compatibility stub; normal WAV-mode gameplay is the
   validated audio path.
 - Keyboard input is validated; controller mapping remains a follow-up.
-- This branch's source build uses i386. Native 64-bit work is on
-  `port/portable-64bit`.
+- AArch64 gameplay has not yet been exercised on real hardware; current
+  coverage is cross-build, ELF ownership checks, and QEMU loader/startup.
 - Windows and macOS remain in progress; neither currently has a release-ready
   native package.

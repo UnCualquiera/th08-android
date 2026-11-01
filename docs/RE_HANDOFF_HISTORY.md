@@ -1,16 +1,17 @@
 # Reconstruction handoff archive
 
-This archive preserves dated handoffs through 2026-10-11. Branches, artifacts,
+This archive preserves dated handoffs through 2026-10-13. Branches, artifacts,
 counts, and next steps below describe those checkpoints. For current work, use
 [RE_HANDOFF.md](RE_HANDOFF.md), the live ledgers, and the
 [documentation index](README.md).
 
-## Native replay handoff — 2026-10-11
+## Replay investigation handoff — 2026-10-13
 
-This snapshot preserves the main-branch handoff after the native replay gate.
-Its partial counts and next steps describe earlier investigation checkpoints.
-Use [REPLAY_RESULTS.md](REPLAY_RESULTS.md) for the completed native and portable
-results, and [RE_HANDOFF.md](RE_HANDOFF.md) for current work.
+This snapshot records the completed replay repair batch before documentation
+consolidation at `cf23cd44`. Its earlier checkpoint paragraphs retain partial
+counts and task instructions from the investigation. Use
+[REPLAY_RESULTS.md](REPLAY_RESULTS.md) for the complete results and
+[RE_HANDOFF.md](RE_HANDOFF.md) for current work.
 
 ### Current status
 
@@ -37,6 +38,138 @@ and [issue ledger](RUNTIME_ISSUES.md) for evidence.
 
 Native 64-bit work is on `port/portable-64bit`; Web work is in `th08-web`.
 Each port has its own build and runtime validation alongside the VC7 path.
+
+### Portable replay repair synchronization
+
+This branch integrates [main PR #26](https://github.com/N0zoM1z0/th08/pull/26),
+including the native replay repairs, comparison guards, and credited offline
+corpus. Native pointer layouts, 32-bit serialized formats, backend optimization,
+and modern parser/lifetime repairs remain part of the portable product.
+
+The 2026-10-12 synchronization gate passed at source commit `2c253eb2`: a fresh
+native-layout x86_64 build and ownership verifier, all 1,106 accepted VC7 units
+from a cold build, and fresh normal/bugfix links with their owner/data/callee
+checks. All six muted portable replay windows passed the structural render
+checks, retaining 5,231 samples. Normal and AddressSanitizer builds each passed
+a 60-second title/demo/Stage 5 smoke check. Repository CI passed.
+
+Stage 5 has one `color-loss-suspect` sample at frame 6,166, enemy 14, sprite 77.
+The same animation/script/sprite has 72 `ok` samples; this observation remains
+unconfirmed and is retained in the report. The portable gate checks bounded
+runtime/render windows; the native 108-case parity result below belongs to the
+VC7 product. See [PORTABLE_64BIT.md](PORTABLE_64BIT.md) for reproduction and
+coverage. Local evidence is in `build/replay-cold-20261011/portable-replays/`;
+build and smoke logs are compressed alongside it. The earlier v0.2.1 checkpoint
+is in [RE_HANDOFF_HISTORY.md](RE_HANDOFF_HISTORY.md). Web work remains deferred.
+
+### Portable rendering repairs
+
+The Linux backend now retains homogeneous clip `W` for XYZ and XYZRHW draws,
+aligns Direct3D/OpenGL pixel centers, refreshes flag-0 backbuffer reads, and
+commits writable unlocks immediately. Read-only unlocks preserve subsequent
+rendering. Fullscreen windows start at desktop dimensions, fixing the Xvfb
+size mismatch. Target-facing source, headers, and ledgers retain the native
+checkpoint.
+
+Fresh x86_64 and i386 builds passed ownership/layout verification. Independent
+pixel contracts pass with the repaired backend and reproduce all four expected
+failures at source `9cf5eae8`. Actual HOME screenshots equal their presented
+frames in both windowed and fullscreen modes. Four retail frame comparisons
+pass; the mean RGB errors are 0.005193 (Stage 1), 0.004768 (Stage 3), 0.292928
+(Stage 5), and 0.323372 (Final B). Stage 5 ordinary/accelerated playfields and
+camera packets agree exactly.
+
+All six muted replay windows pass with normal life rules and the normal
+boss-name copy, retaining 8,810 enemy-render samples. Nine Stage 5 color suspects
+remain heuristic observations. The 60-second sanitizer title/demo/Stage 5 smoke
+and 90-second direct Stage 5 sanitizer replay audit pass; the latter retains
+1,891 samples. Local evidence is in `build/portable-render-fix-20261012/`.
+
+Use [PORTABLE_RENDERING.md](PORTABLE_RENDERING.md) and
+`scripts/test-portable-rendering.py` for reproduction. The earlier
+[background study](PORTABLE_BACKGROUND.md) and
+[runtime review](PORTABLE_RUNTIME_REVIEW.md) preserve the pre-fix observations.
+The x86_64 and i386 state suites each pass all 108 recordings. Remaining pixel
+differences and AArch64 hardware gameplay remain separate validation tasks.
+
+### Portable replay state gate
+
+The serial portable runner now compares the credited corpus against validated
+retail traces, using the same 25-field schema and published fingerprints as
+the native gate. Its optional compiled recorder reads typed fields and exits
+through normal shutdown after natural replay deletion. A GDB backend provides
+independent checks and bounded enemy/item motion diagnostics.
+
+Trace validation and comparison now stream rows. Revalidation of all 108
+retained retail/native pairs reproduces their preceding reports and published
+fingerprints over 12,311,460 calculations. The `easy-1-b` comparison's peak
+resident size falls from 227 MiB to 17.5 MiB; 29 comparison tests, seven
+reference-identity tests, and repository CI pass. Reproduction and cleanup
+commands are in [PORTABLE_REPLAY_TESTING.md](PORTABLE_REPLAY_TESTING.md).
+This revalidation checks the comparator; it reuses the completed cold captures.
+
+The first batch exposed a Magic Team Lunatic Final A score difference at
+Stage 4A frame 14,564: internal score +12. Modern C++ selected the float
+`atan2` overload in `VectorAngle @ 0x0040C7B0`; the portable branch now selects
+the original double path. Two Float3 helpers also retain trigonometric precision
+through multiplication. The native branches preserve their preceding emission.
+
+The vector-precision checkpoint at `5b537b4c` passed six full x86_64 recordings
+and 667,371 calculations,
+including all recorded end scores and natural replay exits. The Stage 4A GDB
+prefix passes 14,566 calculations; 14,463 enemy motion observations agree with
+retail. Asset-free math contracts pass and reproduce the earlier failures.
+The accepted VC7 ledger passes all 1,106 units from a cold build.
+
+Use [PORTABLE_REPLAY_TESTING.md](PORTABLE_REPLAY_TESTING.md) for the full suite
+and [PORTABLE_VECTOR_PRECISION.md](PORTABLE_VECTOR_PRECISION.md) for diagnosis
+and controls. Evidence is in `build/portable-state-20261012/`. The next batch
+completed 29 recordings and found three differences before it was paused.
+`matrix-fixed/` retains that candidate's results. Border Team Normal Stage 1
+traced to [D3DX normalization rounding](PORTABLE_NORMALIZATION.md); the repaired
+recording passes all 100,979 calculations. Ordinary GDB playback passes its
+2,517-calculation prefix. The two Solo Yuyuko failures traced to
+[polar motion precision](PORTABLE_POLAR_MOTION.md). The latest x86_64 candidate
+passes all three complete recordings over 358,140 calculations. Its GDB
+Yuyuko Easy prefix passes 6,826 calculations and 6,824 shared enemy-motion
+records. The final x86_64 build passes all 108 recordings over 12,311,460
+calculations in `matrix-final/`, including all 25 fields, stage-end scores,
+natural replay exits, and published fingerprints. A second validation pass
+reproduces every report and checks retained capture identities and completion
+records. The candidate uses gameplay source `af9cb1d3` and executable SHA-256
+`d74a574ac983d2df7c7a52cd421a868a01b90c34471881802ed83cea9e5b802f`.
+The full run took 4 hours 14 minutes and peaked at 240 MiB resident size.
+Its `--verify-only` pass took 10 minutes 51 seconds and peaked at 53 MiB.
+`build/portable-state-20261012/final-full-suite.log` records its result.
+
+The i386 [device precision repair](PORTABLE_I386_FLOATING_POINT.md) resolves
+the Stage 5 frame 3,789 drift. The final i386 build passes all 108 recordings
+over 12,311,460 calculations in `i386-matrix-fpu/`, including all 25 fields,
+stage-end scores, natural replay exits, and published fingerprints. A separate
+retained-evidence pass recomputes every comparison and checks each capture,
+report, and ledger entry. The candidate executable has SHA-256
+`34a358542feb2188304ce91c7b02b60d2a463a167f74f8f698add8d96296b9af`.
+The serial suite took 5 hours 21 minutes 59 seconds and peaked at 205 MiB;
+revalidation took 11 minutes 5 seconds and peaked at 53 MiB. GDB independently
+passes 60,797 calculations and records retail's `0x007F` control word.
+Asset-free device defaults and FPU-preservation contracts pass and reproduce
+the old backend's failure. Use `--verify-only` as documented in
+[PORTABLE_REPLAY_TESTING.md](PORTABLE_REPLAY_TESTING.md) to reproduce the
+retained-evidence checks without launching the game.
+
+The accepted VC7 ledger passes all 1,106 units from a new cold build after
+the motion repair. Fresh normal/bugfix links and their owner/data/callee
+checks pass. All four retail frame checks pass after the motion repair.
+Retain tested binaries and provenance when removing owned compiler trees.
+
+At that checkpoint the ordinary build passed the 14,566-calculation Stage 4A prefix.
+All four retail frame/camera checks pass after the math repair, and Stage 5
+ordinary/accelerated playfields remain identical. Fresh normal/bugfix links
+and their owner/data/callee checks pass. Repository CI and the remote i386,
+x86_64, and AArch64 build jobs pass at `5b537b4c`. This checkpoint is pushed;
+Web work remains deferred.
+
+<a id="native-replay-handoff--2026-10-11"></a>
 
 ### Native replay parity investigation
 
@@ -2712,3 +2845,275 @@ numeric effect/sound/ANM resource IDs.  The reusable source-shape rules are in
 `.agents/skills/th08-semantic/SKILL.md`.  This closes the protocol/readability
 milestone; future reconstruction work begins from the latest `main` on a fresh
 short-lived branch.
+
+## Portable v0.2.1 checkpoint before replay synchronization
+
+Archived from portable commit `861bec90`. The observations below belong to
+that checkpoint; current validation is in [RE_HANDOFF.md](RE_HANDOFF.md).
+
+
+`port/portable-64bit` now integrates the completed native Windows i386
+prerequisite from `main`. This is a source-level integration, not a modern-only
+patch: the corrected production owners, aggregate-field aliases, direct
+callees, and initialized target data are shared by the exact-facing and
+portable builds. In particular, the merge brings the following issue-relevant
+repairs into native-layout x86_64:
+
+- all three Background draw gates test `Gui::IsStageFinished`, so ordinary
+  boss dialogue keeps drawing the stage instead of producing a black/frozen
+  background;
+- `Gui::CopyEnemyNameTexture` selects `frontAnm`, the owner of the boss-name
+  sprites, instead of the six-entry stage-text array;
+- the player gauge thresholds are fields of `g_GameManager`, preventing the
+  zero-threshold score/graze inflation observed in the native prerequisite;
+- spell backgrounds use `g_EffectManager.stageEffectAnm`, and the complete
+  effect, Last Spell, stage-clear bonus, and dialogue-palette data have real
+  production owners;
+- randomized player shots use the signed RNG path, while point-star/time-orb
+  values use the three-entry player-point popup pool.
+
+These repairs directly overlap reports in
+[th08 issue #16](https://github.com/N0zoM1z0/th08/issues/16) and the Stage 5
+background symptom in
+[th08-web issue #1](https://github.com/N0zoM1z0/th08-web/issues/1). They are
+strong source-level candidates, but an overlap is not by itself closure for a
+different frontend or runtime. Work on `th08-web` remains deliberately out of
+scope until the native 64-bit branch is settled.
+
+The v0.2.1 Linux runtime refresh is prepared from the integrated portable head.
+The x86_64 product builds as an ELF64 PIE and passes native ownership
+verification. An isolated 40-second smoke run progressed from title through
+the bundled demo route to the Stage 5 resources. That proves loading and
+progression, not complete replay/input determinism or visual parity. The cold
+VC7 replay remains **1,106 / 1,106 exact**, a fresh normal VC7 image links, the
+Windows i386 runtime-data verifier passes, and `scripts/ci.py` passes. Portable
+Linux workflow run `34501198228` rebuilt and packaged the integrated i386,
+x86_64, and AArch64 heads successfully. The downloaded artifacts pass their
+published SHA-256 checks, have the expected ELF machine/type, contain the
+documented launchers, and remain free of original game data. Real-hardware
+AArch64 gameplay remains pending.
+
+The first native-layout follow-up removes two port-specific failure classes.
+The handwritten D3D8/D3DX8/SDL compatibility hot paths now use bounded `-O2`
+only in native-layout builds; reconstructed game TUs and fixed-layout i386 stay
+at `-O0`. Under identical Xvfb/llvmpipe conditions, the first 1,200 FPS-check
+swaps fell from 13.485 to 3.442 seconds (3.92x). AddressSanitizer then exposed
+the target's one-byte LZSS end read, a stale four-byte encrypted-resource size,
+and scalar deletion of arrays owned by streaming audio, TitleScreen, MusicRoom,
+and shortcut resolution. Modern-only bounds/length/delete pairing repairs keep
+the target-facing source exact. A 60-second ASan run completed title, bundled
+demo, Stage 5 loading, and return-to-title cleanup without another report. The
+normal x86_64 build and the container-built fixed-layout i386 build passed the
+same 60-second route. A cold replay verified all **1,106 / 1,106** configured
+exact units, the normal VC7 image linked, and the Windows i386 runtime-data
+verifier passed. Reproduction commands and evidence limits are in
+`docs/PORTABLE_64BIT.md`.
+
+Open portable investigations remain full replay parity, dense-pattern and
+browser performance, the post-spell boss/familiar gauges, result-screen status,
+negative spell-bonus reports, and the one-line invisible-laser report in
+[th08 issue #20](https://github.com/N0zoM1z0/th08/issues/20). The target-facing
+laser spawn/update/draw functions are exact, while issue #20 currently omits
+the boss, stage or spell, platform, package version, screenshot, and replay.
+Do not change laser behavior or claim closure until the report is reproduced
+and localized to either shared game state or a portable renderer boundary.
+Likewise, do not close the broad
+[th08 issue #18](https://github.com/N0zoM1z0/th08/issues/18) from the smoke test
+alone: it does not yet provide a sufficiently bounded reproduction.
+
+
+## Laser validation checkpoints before the final platform refresh, October 14, 2026
+
+This is a historical session snapshot. Current products and pending gates are
+listed in [RE_HANDOFF.md](RE_HANDOFF.md).
+
+Laser image work is active on `test/portable-laser-visual-regression`.
+The preceding x86_64 Debug recorder has SHA-256
+`62386854ab8e486a8ad742c97f27b7f2063d39e008aefc4af8600dd083b9aecc`,
+with build identities under `build/laser-legacy-20261014/production/`.
+Earlier 108-recording gates remain scoped to their published binaries.
+That binary's complete `lunatic-0-b` recording passes 113,221
+calculations on all 25 fields with a natural replay exit; retained-evidence
+verification passes.
+
+Both default and forced OpenGL 2.1 contexts pass six asset-free renderer
+groups. The legacy path now inverts its FBO and maps CPU/GPU reads, writes,
+clears, audit regions, and presentation consistently. Its eight Stage 3 and
+Stage 4B frames pass the unchanged 1.0 image limit, retaining exact retail
+laser/VM packets. GDB observes OpenGL 2.1 and a null clip-control pointer.
+Frame 12,900's 49 high-error edge pixels disappear. The legacy API probe
+matches all 34 solid images and 52/68 total images; the old-source control
+differs in all 68. All 297 color samples, 144 D3DX copies, and 196,608 exhaustive
+copies pass in the forced legacy profile. See
+[the laser workflow](PORTABLE_LASER_VISUALS.md) for captures, source controls,
+and the `--legacy-gl` reproduction commands.
+
+The original-game font evidence confirms Droid Sans Fallback, GDI height
+28 mapped to 21 ppem, and 81 bold-text parameter records equal to portable.
+The Linux height/baseline repair uses OpenType Windows metrics. Remaining
+bold-width/grayscale differences now have an offline rasterization control:
+all 27 production font images reproduce exactly before changing settings.
+Normal hinting reduces average error by 2.7%; disabling kerning changes none
+of the control pixels, and disabling bold worsens 20 of 27 images. SDL_ttf's
+two-pixel synthetic-bold advance at 21 ppem differs from Wine's one-pixel
+advance. A direct FreeType control of glyph advance, outline emboldening and
+grayscale transfer now reproduces 26 of 27 Wine
+images exactly, with all 27 visible-pixel masks equal. The remaining pixel is
+`(208,22)` in height-28 probe text 1: gray 217 versus Wine's 208. The system
+i386/x86_64 API control now localizes it to FreeType rasterization: pre/post-bold
+outlines agree, four raw coverage values differ by one, and only coverage
+165/166 crosses a gray-level boundary. The production scalable-font adapter now
+uses those GDI rules. Fresh API checks give 26/27 exact text images, 96/96 exact
+regular blend cases, and 96 semibold blend cases with differences confined to
+measured coverage locations and bounds. RGB555 pen/destination quantization
+also repairs 2,712 pixels found by the first blend repetition. The recorder is
+`4cce0fe8ee633fa2b37713214793fef078395edbb303f52c0cdd98e4bc914cc6`, with
+build identity under `build/font-production-20261014/production/`. All eight
+default-font Stage 3/4B laser images and four matched-Droid Stage 3 images pass
+the original limits with exact raw laser/VM packets. Matched-font game-image
+residuals now have a scaling candidate: the text helper requests filter 4 for
+half-size copies, while portable discards that argument and uses nearest-neighbor
+coordinates. Canonical D3DX8 forwards the filter through its fallback and
+validates types 1–5. A fresh VC7 probe linked to the pinned D3DX8 archive now
+confirms the API defect: 72/160 surfaces match, all eight half-size filter-4
+cases differ, and portable output ignores all five filters. Equal-size and
+scaled point-filter copies match. An independent repetition retains identical
+pixel records. The production filter repair now matches all 640 extended API
+cases under both the system compiler and GCC 8, including defaults, edge flags,
+cross-format conversions, offset rectangles and rounding-state preservation.
+The previous backend still reproduces the 72/160 failure control. Fresh color,
+exhaustive-copy and six-group renderer checks pass. The new GCC 8 recorder is
+`7eb846a665867ed9e8a1c19484d2c0fe1ee586954f0ecca3b1b756223e0e0853` under
+`build/surface-filter-repair-20261014/production/`. All four matched-Droid Stage 3
+images pass with exact laser/VM packets; frame 12,900's complete header changes
+from 1,081 differing pixels to three. Stage 4B's four beam results remain equal
+to the prior product. Default-font Stage 3 also passes all four limits with
+exact packets. Final A's five frames also pass with exact packets; frame
+15,090's beam error improves to 0.812111. All seventeen image checks pass.
+The complete `lunatic-0-b` and `lunatic-1-a` recordings pass 232,906 calculations
+on all 25 fields, end scores and natural exits. Retained-evidence verification
+also passes both. The same product's 108-recording gate and retained-evidence
+verification now pass 12,311,460 calculations on all 25 fields, end scores,
+fingerprints and natural exits. Evidence is under
+`build/surface-filter-repair-20261014/x64-suite/`, reusing validated retail
+references with fresh isolated recorder processes. The i386 refresh remains
+separate. Compiled source checkpoint is `183cd755`;
+all 132 recorded build-input hashes agree with its normalized Git blobs. See
+[the scaling observation](PORTABLE_LASER_VISUALS.md#remaining-title-texture-scaling).
+The complete `lunatic-0-b` recording and
+retained-evidence gate pass 113,221 calculations on all 25 fields, end scores
+and natural exit. All six renderer contract groups pass. The new product's complete corpus and i386
+refresh remain separate gates. See the
+[font controls](PORTABLE_LASER_VISUALS.md#font-rasterization-controls-october-14-2026).
+
+The earlier clip-control API probe retains 15 striped-material sampling
+differences; the legacy probe retains 16. An XY grid control passes 59/68
+images, with nine first-row differences coinciding with Wine's offset-viewport
+sensitivity. Private viewport mapping does not resolve them. Its evidence
+is under `build/laser-sampling-20261014/`; `--position-grid 256` reproduces
+the control. Final B's seven added frames exposed one-ULP origin-Y differences
+in slots 12 and 19 at 8,400. Paired spawn observations locate them in the ECL
+standalone sine/cosine outputs: eight differing offsets among 390 calls, with
+both failing origins created at 8,242. The opcode 32/33 repair now passes all
+390 input records and all seven laser/VM packets with unchanged beam errors.
+The final GCC 8 recorder SHA-256 is
+`e0a57a43520524713b70dbaa38329155fd6ab4a09006869b4f09db8dbcc27649`, under
+`build/laser-spawn-origin-20261014/production-final/`. Source checkpoint is
+`897decb2`; all 132 build-input hashes agree after LF normalization. This
+product repeats all 390 inputs and seven image/packet checks successfully.
+The affected native RunEcl unit passes a fresh build and exact comparison.
+The full replay refresh is running under
+`build/laser-spawn-origin-20261014/x64-suite/`, followed automatically by
+retained-evidence verification. Resume the existing job/output identity;
+i386 remains separate. Both owned compiler trees and the initial repair
+executable have been removed. See the
+[Final B observation](PORTABLE_LASER_VISUALS.md#final-b-precision-observation-october-14-2026).
+Extra images remain to be captured. Issue #20's reported scene is unspecified.
+
+The native owner repair is also prepared on `fix/native-spell-background-owner`
+in the private worktree `.analysis/native-main-owner-20261014/`, based on
+main `4fe9ce61`. All three affected units and the full 1,106-unit cold gate pass.
+Fresh normal and bugfix links pass the owner/data/callee guard. Products and
+reports are under `build/laser-native-20261014/main-production/`; their fresh
+native replay and Final A image gates remain pending before a main PR/merge.
+The worktree exposed checkout-specific anonymous-namespace names in two replay
+units. The comparator now normalizes only their generated discriminator and
+records the actual COFF names, with ambiguity, signature, extent and relocation
+checks preserved. A fixed-output two-path compiler probe confirms the cause;
+the portable checkout's own cold 1,106-unit gate also passes. The temporary
+suite scheduler guard resumed the existing portable job at its deadline.
+
+The refreshed i386 recorder is
+`a82e7155eb7c71e5db645df9294cd5316e895df5f35dcbce696946ba4ba9de27`.
+Both context profiles pass seven renderer/FPU groups and the same eight laser
+frames each. Its complete `lunatic-0-b` recording and retained-evidence gate
+pass 113,221 calculations on all 25 fields. Evidence is under
+`build/laser-i386-20261014/`. The actual i386 compiler is Debian GCC 12.2.0;
+the older provenance's GCC 8.4.0 label has a preserved correction addendum.
+Seven playfields per profile equal the retained x86_64 pixels. Stage 4B frame
+15,360 retains a small background-shading difference, with means 0.073440 and
+0.074393. The [draw-input investigation](PORTABLE_DRAW_INPUTS.md) confirms that
+195 zero-alpha RGB words in the background call differ while all other inputs
+agree. Borrowing those words yields pixel-identical playfields. The canonical
+target also writes alpha only in its far-fog branches; reconstruction behavior
+is preserved. Experimental controls remain separate from ordinary image gates.
+
+The Magic Team Lunatic Final A case `finala-eirin` adds five paired frames.
+The five baseline failures lead to a shared-owner repair: target address
+`0x004E4B64` is `Background::spellVmScriptBase @ +0xB34`, previously split into
+standalone `g_GuiMessageStageMode` storage in native and portable. All production
+and probe writers now use the field. Seven relocation entries migrate to the
+canonical Background base with their `0xB34` addend; masked instruction bytes
+remain equal. The cold gate passes all 1,106 accepted units. Fresh normal and
+bugfix links pass the new seven-write/one-read owner guard; the retained older
+native image fails that guard.
+
+The initial repaired x86_64 product `c421597e…` passes all five original image
+limits, with means 0.003248–0.862803 and the pinned retail laser/VM hash. At
+frame 9,570, the two background submissions now match retail words exactly;
+the baseline differed in 22 position/UV words. The final x86_64 recorder is
+`34bcdd33b2d31a52e418e9f806314fb00c68ac2fd5cea2bad8259f6a5de9fab9`, with build
+identity under `build/laser-background-owner-20261014/production/`. Its allocated
+ELF sections match the initial repaired product. All five final captures pass
+the original limits and retain pixel-identical playfields to the initial repair.
+Its complete `lunatic-1-a` recording and retained-evidence check pass 119,685
+calculations on all 25 fields, recorded end scores and natural exit.
+Native bugfix SHA-256 is
+`1b8e217a7fe48b74304b1cbf01600385e78f13273e63a6b90bcc1c32436e45f4`.
+RT-014 is closed after native Final A repetition: four default-profile playfields
+are pixel-identical to retail, and frame 15,090 becomes pixel-identical in paired
+`csmt=0` captures. Its default screenshot lagged despite exact laser packets and
+all 22,590 recorded calculations. The explicit Wine scheduling control resolves
+that capture failure; both profiles and the failed image remain retained.
+The native complete `lunatic-1-a` recording passes 119,685 calculations on all
+25 fields, end scores and natural exit at clock rate 128 without rasterization.
+Native evidence is under `build/laser-native-20261014/`. The runner supports
+`--native-map` and paired `--wine-csmt 0`; the comparator requires matching Wine
+settings and completed mapped-observer evidence.
+The native refresh under `build/laser-native-20261014/full-state128/` is complete:
+108/108 recordings and 12,311,460 calculations agree on all 25 fields, recorded
+end scores, fingerprints and natural replay exits. Retained-evidence verification
+also passes all 108. This gate uses fresh serial candidate captures against
+validated retail references, clock rate 128, no rasterization and ptrace
+observations. Owned runtime directories and the shared Wine prefix are removed.
+The summary pins the native product above to owner-repair checkpoint `096c5a87`.
+
+Next finish the repaired ECL product's full replay gate, refresh i386 and
+capture Extra visual cases. Evidence is under
+`build/laser-background-owner-20261014/` and `build/laser-stage4a-20261014/`; see the
+[Final A observation](PORTABLE_LASER_VISUALS.md#final-a-observation-october-14-2026).
+The scout now supports interval 1, samples at Present entry, records counter
+gaps, and enforces a 32 MiB snapshot capacity. This recording's Stage 4A survey
+observed no active lasers in 22,947 presented samples; its older report predates
+gap accounting and supports no claim about unobserved calculations.
+
+For runtime work, select a concrete remaining visual or hardware scenario and
+retain the stage, route, recording, frame, and comparison evidence. For exact
+reconstruction, resume the authored near match or one bounded whole-link/library
+dependency. The ANM semantic queue keeps opcodes 25, 31, and 88 neutral until
+complete TH08 consumer evidence supports a shared-layout rename.
+
+<a id="documentation-batch-for-local-review"></a>
+
+The completed human/agent documentation batch and earlier repair investigations
+are retained in the [handoff archive](RE_HANDOFF_HISTORY.md#replay-investigation-handoff--2026-10-13).

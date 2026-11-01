@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 3.20)
 
 project(th08-modern LANGUAGES CXX)
 
-if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
-    message(FATAL_ERROR "TH08 currently requires a 32-bit toolchain.")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(TH08_PORTABLE_NATIVE_LAYOUT ON)
+elseif(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+    message(FATAL_ERROR "TH08 requires a 32-bit or 64-bit toolchain.")
 endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -80,22 +82,40 @@ if(WIN32)
     list(APPEND TH08_GAME_SOURCES src/modern/windows_runtime.cpp)
     add_executable(th08-modern WIN32 ${TH08_GAME_SOURCES})
 elseif(UNIX AND NOT APPLE)
-    list(APPEND TH08_GAME_SOURCES
+    set(TH08_LINUX_ADAPTER_SOURCES
         src/modern/linux/d3d8_compat.cpp
         src/modern/linux/d3dx8_compat.cpp
         src/modern/linux/linux_compat.cpp
         src/modern/linux/linux_runtime.cpp
+        src/modern/linux/render_audit.cpp
     )
+    set(TH08_LINUX_HOT_ADAPTER_SOURCES
+        src/modern/linux/d3d8_compat.cpp
+        src/modern/linux/d3dx8_compat.cpp
+        src/modern/linux/linux_compat.cpp
+    )
+    list(APPEND TH08_GAME_SOURCES ${TH08_LINUX_ADAPTER_SOURCES})
     add_executable(th08-modern ${TH08_GAME_SOURCES})
 else()
     message(FATAL_ERROR "The modern target currently supports Windows and Linux.")
 endif()
 add_dependencies(th08-modern th08-modern-generated)
+option(TH08_ENABLE_REPLAY_TRACE "Enable portable replay state test hooks" OFF)
+if(TH08_ENABLE_REPLAY_TRACE)
+    if(NOT UNIX OR APPLE)
+        message(FATAL_ERROR "Replay state test hooks currently require Linux.")
+    endif()
+    target_sources(th08-modern PRIVATE src/modern/linux/replay_trace.cpp)
+    target_compile_definitions(th08-modern PRIVATE TH08_ENABLE_REPLAY_TRACE)
+endif()
 target_compile_features(th08-modern PRIVATE cxx_std_98)
 target_compile_definitions(th08-modern PRIVATE
     TH08_MODERN_PORT
     WIN32_LEAN_AND_MEAN
 )
+if(TH08_PORTABLE_NATIVE_LAYOUT)
+    target_compile_definitions(th08-modern PRIVATE TH08_PORTABLE_NATIVE_LAYOUT)
+endif()
 target_include_directories(th08-modern PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${TH08_GENERATED_DIR}"
@@ -169,6 +189,7 @@ elseif(UNIX AND NOT APPLE)
     pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
     pkg_check_modules(SDL2_TTF REQUIRED IMPORTED_TARGET SDL2_ttf)
     find_package(Fontconfig REQUIRED)
+    find_package(Freetype REQUIRED)
     # Prefer the broadly deployed libGL.so.1 runtime ABI over GLVND's separate
     # libOpenGL.so.0 dispatch library for the 32-bit portable build.
     set(OpenGL_GL_PREFERENCE LEGACY)
@@ -186,18 +207,30 @@ elseif(UNIX AND NOT APPLE)
         -fpermissive
         -fdata-sections
         -fno-omit-frame-pointer
-        -fno-pie
         -Wno-write-strings
         "-include${CMAKE_SOURCE_DIR}/src/modern/linux/linux_compat.hpp"
     )
-    target_link_options(th08-modern PRIVATE
-        -no-pie
-        -rdynamic
-        "-Wl,-T,${CMAKE_SOURCE_DIR}/src/modern/linux/th08-layout.ld"
-    )
-    set_property(TARGET th08-modern APPEND PROPERTY LINK_DEPENDS
-        "${CMAKE_SOURCE_DIR}/src/modern/linux/th08-layout.ld"
-    )
+    # The sources above this adapter boundary are reconstructed VC7 game TUs
+    # and deliberately retain -O0. These files are the new SDL/OpenGL platform
+    # implementation, including the per-vertex renderer and pixel converters;
+    # compiling those handwritten hot paths at -O0 needlessly consumes the
+    # frame-time budget needed to sustain the port's 60 Hz target under load.
+    if(TH08_PORTABLE_NATIVE_LAYOUT)
+        set_source_files_properties(${TH08_LINUX_HOT_ADAPTER_SOURCES} PROPERTIES
+            COMPILE_OPTIONS "-O2;-fno-strict-aliasing"
+        )
+    endif()
+    target_link_options(th08-modern PRIVATE -rdynamic)
+    if(NOT TH08_PORTABLE_NATIVE_LAYOUT)
+        target_compile_options(th08-modern PRIVATE -fno-pie)
+        target_link_options(th08-modern PRIVATE
+            -no-pie
+            "-Wl,-T,${CMAKE_SOURCE_DIR}/src/modern/linux/th08-layout.ld"
+        )
+        set_property(TARGET th08-modern APPEND PROPERTY LINK_DEPENDS
+            "${CMAKE_SOURCE_DIR}/src/modern/linux/th08-layout.ld"
+        )
+    endif()
     target_include_directories(th08-modern BEFORE PRIVATE
         "${CMAKE_SOURCE_DIR}/src/modern/linux/include"
     )
@@ -206,6 +239,7 @@ elseif(UNIX AND NOT APPLE)
         PkgConfig::SDL2_IMAGE
         PkgConfig::SDL2_TTF
         Fontconfig::Fontconfig
+        Freetype::Freetype
         OpenGL::GL
         Threads::Threads
         dl
